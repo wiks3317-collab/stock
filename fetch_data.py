@@ -1,5 +1,5 @@
 """用法：python fetch_data.py history | live | daily
-  live    ：只更新即時價量（盤中每 10 分鐘）
+  live    ：只更新即時價量（GitHub Actions 排程約每 5 分鐘；實際可能受 GitHub 排程延遲影響）
   history ：只更新 K 線
   daily   ：K 線 + 股利/公司資訊 + 新聞 + 全市場名單（收盤後每日）
   universe：只更新全市場名單與當日行情（台股上市/上櫃/興櫃/ETF、美股 S&P500+Nasdaq100+ETF）
