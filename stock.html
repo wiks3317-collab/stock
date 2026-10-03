@@ -85,9 +85,9 @@ const cls=(s,v)=>(s.m=='TW'?v>=0:v<0)?'up':'dn';
 const col=(m,up)=>(m=='TW')==up?'#e5484d':'#2fa36b';
 const f2=n=>n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fv=s=>{const v=s.k[s.k.length-1].v;return s.m=='TW'?Math.round(v).toLocaleString()+' 張':(v/1e6).toFixed(1)+'M 股'};
-function row(s,i){const st=fav.includes(s.m+s.code);return `<tr class="r" data-k="${s.m+s.code}"><td><span class="star ${st?'on':''}" data-f="${s.m+s.code}">${st?'★':'☆'}</span>${i?i+'. ':''}${s.code} ${s.name}${s.tags.slice(0,2).map(t=>`<span class="tag">${t}</span>`).join('')}</td><td class="${cls(s,s.chg)}">${f2(s.p)}</td><td class="${cls(s,s.chg)}">${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</td><td>${fv(s)}</td><td>${Math.round(s.score)}</td></tr>`}
+function row(s,i){VIS.push(s.m+s.code);const st=fav.includes(s.m+s.code);return `<tr class="r" data-k="${s.m+s.code}"><td><span class="star ${st?'on':''}" data-f="${s.m+s.code}">${st?'★':'☆'}</span>${i?i+'. ':''}${s.code} ${s.name}${s.tags.slice(0,2).map(t=>`<span class="tag">${t}</span>`).join('')}</td><td class="${cls(s,s.chg)}">${f2(s.p)}</td><td class="${cls(s,s.chg)}">${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</td><td>${fv(s)}</td><td>${Math.round(s.score)}</td></tr>`}
 const th='<div class="tw"><table><tr><th>股票</th><th>現價</th><th>漲跌幅</th><th>成交量</th><th>熱度</th></tr>';
-function render(){const m=$('main'),T=TREE[mkt];
+function render(){VIS=[];const m=$('main'),T=TREE[mkt];
  $('inds').innerHTML=['🔥 全市場熱門','⭐ 自選',...Object.keys(T)].map(x=>`<button class="chip ${x==ind?'on':''}" data-i="${x}">${x}</button>`).join('');
  let h='';
  if(q){const r=all().filter(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase())).slice(0,50);h=`<div class="sec"><h2>搜尋結果（${r.length}）</h2>${th}${r.map(s=>row(s)).join('')}</table></div></div>`}
@@ -97,7 +97,7 @@ function render(){const m=$('main'),T=TREE[mkt];
  m.innerHTML=h}
 function news(s){const a=['法人上修目標價，看好後市接單動能','外資買超，股價量能放大','公布最新月營收，年增表現受市場關注','宣布擴產計畫，產能預計逐步開出','產業供應鏈傳出新訂單消息'];const r=rng(s.r+new Date().getDate());
  return [0,1,2,3].map(i=>`<div class="news">${s.name}${a[Math.floor(r()*a.length)]}<br><small>${String(8+i*2).padStart(2,'0')}:${String(Math.floor(r()*59)).padStart(2,'0')} ・ 示範範例標題</small></div>`).join('')}
-function detail(key,range=90,tab=0){const s=S[key];if(!s)return;if(s.snap)return snapDetail(s);const r=rng(s.r+9),us=s.m=='US',d=new Date(),ex=new Date(+d+(10+Math.floor(r()*60))*864e5),pay=new Date(+ex+25*864e5),cash=us?(.2+r()*1.2):(.5+r()*6);
+function detail(key,range=90,tab=0){const s=S[key];if(!s)return;if(s.snap)return PROXY_URL?loadStock(s):snapDetail(s);const r=rng(s.r+9),us=s.m=='US',d=new Date(),ex=new Date(+d+(10+Math.floor(r()*60))*864e5),pay=new Date(+ex+25*864e5),cash=us?(.2+r()*1.2):(.5+r()*6);
  const hi=Math.max(...s.k.map(x=>x.h)),lo=Math.min(...s.k.map(x=>x.l));
  const sig=[s.p>s.m5?'站上5日線':'跌破5日線',s.p>s.m20?'站上月線':'跌破月線',s.p>s.m60?'站上季線':'跌破季線',s.rsi>70?'RSI 過熱':s.rsi<30?'RSI 超賣':'RSI 中性',s.kd>80?'KD 高檔':s.kd<20?'KD 低檔':'KD 中性'];
  $('md').innerHTML=`<div class="row" style="justify-content:space-between"><div><b style="font-size:18px">${s.code} ${s.name}</b><br><span class="tag" style="margin:0">${us?'美股':'台股'} ・ ${s.i} › ${s.sub}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
@@ -169,8 +169,8 @@ async function loadQuotes(){try{const q=await getJSON('live.json');
   else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('live.json 載入失敗',e)}}
 function demoTick(){all().forEach(s=>{const l=s.k[s.k.length-1];if(Math.random()<.5){l.c*=1+(Math.random()-.5)*.004;l.h=Math.max(l.h,l.c);l.l=Math.min(l.l,l.c);l.v*=1+Math.random()*.003}})}
 setInterval(async()=>{if(!liveOn)return;tk++;
- if(real){if(tk%20)return;await loadQuotes()}else demoTick();
- recalc();if($('ov').style.display!='block')render();else if(real&&cur&&cur[2]==0)detail(cur[0],cur[1],0)},3000);
+ if(PROXY_URL){if(tk%5)return;await proxyQuotes()}else if(real){if(tk%20)return;await loadQuotes()}else demoTick();
+ recalc();if($('ov').style.display!='block')render();else if((real||PROXY_URL)&&cur&&cur[2]==0)detail(cur[0],cur[1],0)},3000);
 const MAP={'半導體業':'電子','電腦及週邊':'電子','光電業':'電子','通信網路':'電子','電子零組件':'電子','電子通路':'電子','資訊服務':'電子','其他電子':'電子','數位雲端':'電子','生技醫療':'生技醫療','航運業':'運輸','觀光餐旅':'百貨零售','貿易百貨':'百貨零售','居家生活':'百貨零售','電子商務':'百貨零售','運動休閒':'百貨零售','金融保險':'金融','建材營造':'營建','綠能環保':'綠能環保','ETF':'ETF','興櫃':'興櫃'};
 const USMAP={'Information Technology':'科技','Health Care':'生技醫療','Financials':'金融','Industrials':'工業運輸','Consumer Discretionary':'零售百貨','Consumer Staples':'零售百貨','Energy':'能源','Utilities':'公用事業','Materials':'原物料','Real Estate':'不動產','Communication Services':'通訊媒體','ETF':'ETF'};
 function snapDetail(s){const l=s.k[1],us=s.m=='US';
@@ -186,5 +186,19 @@ async function loadUniverse(){try{const u=await getJSON('universe.json');
  (u.data.US||[]).forEach(x=>add('US',x,USMAP[x[2]]||x[2],x[3]));
  for(const m of ['TW','US']){const a=all().filter(s=>s.snap&&s.m==m).sort((p,q)=>p.k[1].c*p.k[1].v-q.k[1].c*q.k[1].v);a.forEach((s,i)=>s.tp=i/a.length)}
  recalc();render()}catch(e){console.warn('universe.json 載入失敗，只顯示精選名單',e)}}
+// 部署 Cloud Run 後，把服務網址貼在下一行（結尾不要加 /）；留空則只用 GitHub 排程資料
+const PROXY_URL='';
+let VIS=[];
+async function pget(p){const r=await fetch(PROXY_URL+p);if(!r.ok)throw new Error(r.status);return r.json()}
+async function loadStock(s){snapDetail(s);const key=s.m+s.code;
+ try{const d=await pget('/stock?key='+encodeURIComponent(key)+'&name='+encodeURIComponent(s.name));
+  if(!d.k||!d.k.length)throw 0;
+  s.snap=0;s.k=d.k.map(x=>({t:x[0],o:x[1],h:x[2],l:x[3],c:x[4],v:x[5]}));DET[key]={div:d.div,ttm:d.ttm,info:d.info};NEWS[key]=d.news;ind_(s);detail(key)}
+ catch(e){$('md').insertAdjacentHTML('beforeend','<p style="color:var(--mu)">轉接服務載入失敗，請稍後再試。</p>')}}
+async function proxyQuotes(){const ks=[...new Set([...(cur?[cur[0]]:[]),...VIS])].slice(0,30);if(!ks.length)return;
+ try{const q=await pget('/quote?keys='+ks.join(','));
+  for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;
+   if(s.snap){const l=s.k[1];l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v;continue}
+   const l=s.k[s.k.length-1];if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('proxy quote',e)}}
 ind='🔥 全市場熱門';render();loadHistory();loadUniverse();
 </script></body></html>
