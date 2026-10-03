@@ -187,7 +187,7 @@ async function loadUniverse(){try{const u=await getJSON('universe.json');
  for(const m of ['TW','US']){const a=all().filter(s=>s.snap&&s.m==m).sort((p,q)=>p.k[1].c*p.k[1].v-q.k[1].c*q.k[1].v);a.forEach((s,i)=>s.tp=i/a.length)}
  recalc();render()}catch(e){console.warn('universe.json 載入失敗，只顯示精選名單',e)}}
 // 部署 Cloud Run 後，把服務網址貼在下一行（結尾不要加 /）；留空則只用 GitHub 排程資料
-const PROXY_URL='';
+const PROXY_URL='https://stock-proxy-885754386445.asia-east1.run.app';
 let VIS=[];
 async function pget(p){const r=await fetch(PROXY_URL+p);if(!r.ok)throw new Error(r.status);return r.json()}
 async function loadStock(s){snapDetail(s);const key=s.m+s.code;
