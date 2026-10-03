@@ -1,9 +1,10 @@
 """用法：python fetch_data.py history | live | daily
   live    ：只更新即時價量（盤中每 10 分鐘）
   history ：只更新 K 線
-  daily   ：K 線 + 股利/公司資訊 + 新聞（收盤後每日）
+  daily   ：K 線 + 股利/公司資訊 + 新聞 + 全市場名單（收盤後每日）
+  universe：只更新全市場名單與當日行情（台股上市/上櫃/興櫃/ETF、美股 S&P500+Nasdaq100+ETF）
 股票清單直接從 stock.html 的 RAW 區塊讀取；輸出資料夾由環境變數 OUT_DIR 指定（預設 data）。"""
-import datetime as dt, email.utils, json, os, re, sys, time
+import datetime as dt, email.utils, io, json, os, re, sys, time
 import urllib.parse, urllib.request, xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
@@ -153,10 +154,114 @@ def news():
         return x[0] + x[1], gnews(*x)
     write("news.json", dict(pmap(one, symbols())))
 
+IND = {"01":"水泥工業","02":"食品工業","03":"塑膠工業","04":"紡織纖維","05":"電機機械","06":"電器電纜","08":"玻璃陶瓷","09":"造紙工業","10":"鋼鐵工業","11":"橡膠工業","12":"汽車工業","14":"建材營造","15":"航運業","16":"觀光餐旅","17":"金融保險","18":"貿易百貨","19":"綜合","20":"其他","21":"化學工業","22":"生技醫療","23":"油電燃氣","24":"半導體業","25":"電腦及週邊","26":"光電業","27":"通信網路","28":"電子零組件","29":"電子通路","30":"資訊服務","31":"其他電子","32":"文化創意","33":"農業科技","34":"電子商務","35":"綠能環保","36":"數位雲端","37":"運動休閒","38":"居家生活"}
+ETFS = {"SPY":"SPDR S&P 500","QQQ":"Invesco QQQ","VOO":"Vanguard S&P 500","VTI":"Vanguard Total Market","IWM":"iShares Russell 2000","DIA":"SPDR Dow Jones","SMH":"VanEck Semiconductor","SOXX":"iShares Semiconductor","XLK":"Tech Select SPDR","XLF":"Financial Select SPDR","XLE":"Energy Select SPDR","XLV":"Health Care Select SPDR","ARKK":"ARK Innovation","TLT":"iShares 20+Y Treasury","GLD":"SPDR Gold","SCHD":"Schwab US Dividend","VIG":"Vanguard Div Appreciation","IBIT":"iShares Bitcoin Trust"}
+UA = {"User-Agent": "Mozilla/5.0"}
+jget = lambda url: json.load(urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60))
+
+def pick(d, *ks):
+    for k in ks:
+        if d.get(k) not in (None, ""):
+            return d[k]
+
+def num(x):
+    try:
+        return float(str(x).replace(",", "").replace("+", ""))
+    except Exception:
+        return None
+
+def tw_universe():
+    info = {}
+    for mk, url in (("L", "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"),
+                    ("O", "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"),
+                    ("R", "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_R")):
+        try:
+            data = jget(url)
+            for d in data:
+                c = pick(d, "公司代號", "SecuritiesCompanyCode")
+                if c:
+                    v = str(pick(d, "產業別", "SecuritiesIndustryCode", "IndustryCode") or "")
+                    info[str(c)] = IND.get(v.zfill(2), v or "其他")
+            print(f"基本資料 {mk}：{len(data)} 筆；欄位", list(data[0])[:6] if data else "")
+        except Exception as e:
+            print("基本資料失敗", mk, e)
+    q = {}
+    def add(c, name, o, h, l, cl, ch, v, mk):
+        if c and cl:
+            q[str(c)] = [str(c), name, mk, o or cl, h or cl, l or cl, cl, ch or 0, round((v or 0) / 1000)]
+    try:
+        for d in jget("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"):
+            add(d.get("Code"), d.get("Name"), num(d.get("OpeningPrice")), num(d.get("HighestPrice")), num(d.get("LowestPrice")),
+                num(d.get("ClosingPrice")), num(d.get("Change")), num(d.get("TradeVolume")), "L")
+    except Exception as e:
+        print("上市行情失敗", e)
+    try:
+        for d in jget("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"):
+            add(d.get("SecuritiesCompanyCode"), d.get("CompanyName"), num(d.get("Open")), num(d.get("High")), num(d.get("Low")),
+                num(d.get("Close")), num(d.get("Change")), num(d.get("TradingShares")), "O")
+    except Exception as e:
+        print("上櫃行情失敗", e)
+    try:  # 興櫃：欄位名稱未經驗證，失敗會略過
+        for d in jget("https://www.tpex.org.tw/openapi/v1/tpex_esb_latest_statistics"):
+            cl, pv = num(pick(d, "LatestPrice", "Close")), num(pick(d, "PreviousAveragePrice"))
+            add(d.get("SecuritiesCompanyCode"), d.get("CompanyName"), None, None, None, cl, (cl - pv) if cl and pv else 0,
+                num(pick(d, "TradingVolume", "TransactionVolume", "Volume")), "R")
+    except Exception as e:
+        print("興櫃行情失敗", e)
+    print(f"台股行情：{len(q)} 檔")
+    return [[c, x[1], x[2], "興櫃" if x[2] == "R" and c not in info else info.get(c, "ETF" if c.startswith("00") else "其他")] + x[3:]
+            for c, x in q.items()]
+
+def us_universe():
+    names = {}
+    for url in ("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", "https://en.wikipedia.org/wiki/Nasdaq-100"):
+        try:
+            html = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60).read().decode("utf-8")
+            for t in pd.read_html(io.StringIO(html)):
+                cols = [str(c) for c in t.columns]
+                sym = next((c for c in ("Symbol", "Ticker") if c in cols), None)
+                if sym and "GICS Sector" in cols:
+                    nm = next((c for c in ("Security", "Company") if c in cols), sym)
+                    sub = "GICS Sub-Industry" if "GICS Sub-Industry" in cols else "GICS Sector"
+                    for _, row in t.iterrows():
+                        names.setdefault(str(row[sym]).strip().replace(".", "-"), (str(row[nm]), str(row["GICS Sector"]), str(row[sub])))
+        except Exception as e:
+            print("美股名單失敗", url, e)
+    for sy, n in ETFS.items():
+        names[sy] = (n, "ETF", "ETF")
+    tk, rows = list(names), []
+    for i in range(0, len(tk), 100):
+        for t, d in download(tk[i:i + 100], "5d").items():
+            if len(d) < 2:
+                continue
+            x, p = d.iloc[-1], d.iloc[-2]
+            n, sec, sub = names[t]
+            rows.append([t, n, sec, sub, r(x.Open), r(x.High), r(x.Low), r(x.Close), r(x.Close - p.Close), int(x.Volume)])
+    print(f"美股：{len(rows)}/{len(tk)} 檔")
+    return rows
+
+def universe():
+    data = {}
+    for k, fn in (("TW", tw_universe), ("US", us_universe)):
+        try:
+            data[k] = fn()
+        except Exception as e:
+            print(k, "名單失敗", e); data[k] = []
+    try:  # 某市場這次抓不到時，保留上次的資料
+        old = json.load(open(f"{OUT}/universe.json", encoding="utf-8"))["data"]
+        for k in data:
+            if not data[k]:
+                data[k] = old.get(k, [])
+    except Exception:
+        pass
+    if not any(data.values()):
+        sys.exit("全市場名單全部失敗，不更新檔案")
+    write("universe.json", data, merge=False)
+
 def daily():
     res = fetch("8mo")
     save_history(res)
-    for step in (details, news):  # 其中一項失敗不影響其他
+    for step in (details, news, universe):  # 其中一項失敗不影響其他
         try:
             step(res) if step is details else step()
         except Exception as e:
@@ -164,4 +269,4 @@ def daily():
 
 if __name__ == "__main__":
     mode = sys.argv[1]
-    {"history": lambda: save_history(fetch("8mo")), "live": live, "daily": daily}[mode]()
+    {"history": lambda: save_history(fetch("8mo")), "live": live, "daily": daily, "universe": universe}[mode]()
