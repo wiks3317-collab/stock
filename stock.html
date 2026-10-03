@@ -152,7 +152,6 @@ $('q').oninput=e=>{
  },350);
 };
 $('live').onclick=()=>{liveOn=!liveOn;$('live').classList.toggle('on',liveOn);$('live').textContent=(liveOn?'● ':'○ ')+'即時更新'};
-$('theme').onclick=cycleTheme;
 // 替換成真實 API：回傳 {代號:{price,volume}} 後更新 S[m+code].k 最後一根
 // 資料放在 repo 的 data 分支，經 raw.githubusercontent.com 讀取（支援跨網域，不需重新部署網站）
 // 自動由 xxx.github.io/repo/ 推算；自訂網域或推算錯誤時，把下一行改成 'https://raw.githubusercontent.com/帳號/repo名稱/data/'
