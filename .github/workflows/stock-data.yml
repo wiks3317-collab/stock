@@ -1,23 +1,31 @@
 name: stock-data
 on:
   schedule:
-    - cron: "*/10 0-5 * * 1-5"    # 台股盤中（UTC 0-5 = 台北 8-13）
-    - cron: "*/10 13-21 * * 1-5"  # 美股盤中
-    - cron: "30 10 * * 1-5"       # 台股收盤後更新 K 線
-    - cron: "30 22 * * 1-5"       # 美股收盤後更新 K 線
+    - cron: "*/10 0-5 * * 1-5"    # 台股盤中（UTC 0-5 = 台北 8-13）→ 即時價量
+    - cron: "*/10 13-21 * * 1-5"  # 美股盤中 → 即時價量
+    - cron: "30 10 * * 1-5"       # 台股收盤後 → K 線 + 股利 + 新聞
+    - cron: "30 22 * * 1-5"       # 美股收盤後 → K 線 + 股利 + 新聞
   workflow_dispatch:
     inputs:
       mode:
-        description: "history 或 live"
-        default: "history"
+        description: "live / history / daily"
+        default: "daily"
 permissions:
   contents: write
 concurrency: stock-data
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: 取得既有的 data 分支（第一次執行時不存在，會略過）
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: data
+          path: pub
+      - run: mkdir -p pub
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -26,13 +34,19 @@ jobs:
         run: |
           S="${{ github.event.schedule }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then M="${{ inputs.mode }}"
-          elif [ "$S" = "30 10 * * 1-5" ] || [ "$S" = "30 22 * * 1-5" ]; then M=history
+          elif [ "$S" = "30 10 * * 1-5" ] || [ "$S" = "30 22 * * 1-5" ]; then M=daily
           else M=live; fi
           echo "MODE=$M" >> "$GITHUB_ENV"
       - run: python fetch_data.py "$MODE"
-      - name: 提交資料
+        env:
+          OUT_DIR: pub
+      - name: 發佈到 data 分支（每次覆蓋，只保留 1 個 commit）
         run: |
+          cd pub
+          rm -rf .git
+          git init -q -b data
           git config user.name "stock-bot"
           git config user.email "stock-bot@users.noreply.github.com"
-          git add data
-          git diff --cached --quiet || (git commit -m "data: $MODE" && git pull --rebase && git push)
+          git add -A
+          git commit -q -m "data ${MODE} $(date -u +%FT%TZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
