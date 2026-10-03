@@ -46,7 +46,7 @@ canvas{width:100%;height:340px;display:block}
 <div id="ov"><div id="md"></div></div>
 <script>
 const RAW={TW:{
-"電子":{"伺服器":"2317 鴻海,2382 廣達,3231 緯創,6669 緯穎,2356 英業達,3706 神達,2376 技嘉,2353 宏碁","散熱":"3017 奇鋐,3324 雙鴻,6230 尼得科超眾,3653 健策,2421 建準","記憶體":"2408 南亞科,2344 華邦電,2337 旺宏,8299 群聯,3260 威剛","載板":"3037 欣興,8046 南電,3189 景碩,2368 金像電","被動元件":"2327 國巨,2492 華新科,2456 奇力新,3026 禾伸堂","封測":"3711 日月光投控,6239 力成,2449 京元電子,6257 矽格","晶圓製造":"2330 台積電,2303 聯電,5347 世界,6770 力積電,3105 穩懋","IP 專利":"3443 創意,3661 世芯-KY,6531 愛普*,3035 智原,6643 M31"},
+"電子":{"伺服器":"2317 鴻海,2382 廣達,3231 緯創,6669 緯穎,2356 英業達,3706 神達,2376 技嘉,2353 宏碁","散熱":"3017 奇鋐,3324 雙鴻,6230 尼得科超眾,3653 健策,2421 建準","記憶體":"2408 南亞科,2344 華邦電,2337 旺宏,8299 群聯,3260 威剛","載板":"3037 欣興,8046 南電,3189 景碩,2368 金像電","被動元件":"2327 國巨,2492 華新科,2456 奇力新,3026 禾伸堂","封測":"3711 日月光投控,6239 力成,2449 京元電子,6257 矽格","晶圓製造":"2330 台積電,2303 聯電,5347 世界,6770 力積電,3105 穩懋","IP 專利":"3443 創意,3661 世芯-KY,6531 愛普*,3035 智原,6643 M31","IC 設計":"2454 聯發科,3034 聯詠,2379 瑞昱,4966 譜瑞-KY,6415 矽力*-KY","網通":"2345 智邦,2412 中華電,4906 正文,6285 啟碁,3704 合勤控","組裝代工":"4938 和碩,2324 仁寶,2301 光寶科","面板光電":"2409 友達,3481 群創,3008 大立光,2393 億光"},
 "生技醫療":{"新藥":"4743 合一,6446 藥華藥,4162 智擎,6547 高端疫苗","醫材":"1795 美時,4126 太醫,4736 泰博,4104 佳醫"},
 "傳產":{"鋼鐵":"2002 中鋼,2014 中鴻,2027 大成鋼,2006 東和鋼鐵","塑化":"1301 台塑,1303 南亞,1326 台化,6505 台塑化","食品":"1216 統一,1227 佳格,1210 大成"},
 "運輸":{"航運":"2603 長榮,2609 陽明,2615 萬海","航空":"2610 華航,2618 長榮航,2646 星宇航空"},
@@ -71,7 +71,7 @@ function mk(m,code,name,i,sub){const r=rng(hs(code)),us=m=='US';let p=us?30+r()*
 const TREE={TW:{},US:{}};
 for(const m in RAW)for(const i in RAW[m]){TREE[m][i]={};for(const sub in RAW[m][i]){TREE[m][i][sub]=RAW[m][i][sub].split(',').map(x=>{const j=x.indexOf(' ');return mk(m,x.slice(0,j),x.slice(j+1),i,sub)})}}
 const ma=(k,n,i)=>i<n-1?null:k.slice(i-n+1,i+1).reduce((a,b)=>a+b.c,0)/n;
-function ind_(s){const k=s.k,n=k.length-1,c=k[n].c;s.p=c;s.pv=k[n-1].c;s.chg=(c/s.pv-1)*100;
+function ind_(s){if(s.snap){const k=s.k;s.p=k[1].c;s.pv=k[0].c;s.chg=s.pv?(s.p/s.pv-1)*100:0;s.vr=1;s.m5=s.m20=s.m60=NaN;s.rsi=s.kd=50;s.bull=false;s.score=(s.tp||0)*50+Math.min(Math.abs(s.chg),10)*6;s.tags=[];if(s.chg>3)s.tags.push("強漲");if(s.chg<-3)s.tags.push("急跌");return}const k=s.k,n=k.length-1,c=k[n].c;s.p=c;s.pv=k[n-1].c;s.chg=(c/s.pv-1)*100;
  s.m5=ma(k,5,n);s.m20=ma(k,20,n);s.m60=ma(k,60,n);
  const av=k.slice(n-20,n).reduce((a,b)=>a+b.v,0)/20;s.vr=k[n].v/av;
  let g=0,l=0;for(let i=n-13;i<=n;i++){const d=k[i].c-k[i-1].c;d>0?g+=d:l-=d}s.rsi=100-100/(1+g/(l||1e-9));
@@ -90,14 +90,14 @@ const th='<div class="tw"><table><tr><th>股票</th><th>現價</th><th>漲跌幅
 function render(){const m=$('main'),T=TREE[mkt];
  $('inds').innerHTML=['🔥 全市場熱門','⭐ 自選',...Object.keys(T)].map(x=>`<button class="chip ${x==ind?'on':''}" data-i="${x}">${x}</button>`).join('');
  let h='';
- if(q){const r=all().filter(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase()));h=`<div class="sec"><h2>搜尋結果（${r.length}）</h2>${th}${r.map(s=>row(s)).join('')}</table></div></div>`}
+ if(q){const r=all().filter(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase())).slice(0,50);h=`<div class="sec"><h2>搜尋結果（${r.length}）</h2>${th}${r.map(s=>row(s)).join('')}</table></div></div>`}
  else if(ind=='🔥 全市場熱門'){const r=all().filter(s=>s.m==mkt).sort((a,b)=>b.score-a.score).slice(0,10);h=`<div class="sec"><h2>${mkt=='TW'?'台股':'美股'}全市場熱門 Top 10</h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}
  else if(ind=='⭐ 自選'){const r=all().filter(s=>fav.includes(s.m+s.code));h=`<div class="sec"><h2>自選股（${r.length}）</h2>${r.length?th+r.map(s=>row(s)).join('')+'</table></div>':'<p style="padding:12px;color:var(--mu)">點股票左側的 ☆ 加入自選</p>'}</div>`}
  else for(const sub in T[ind]){const r=[...T[ind][sub]].sort((a,b)=>b.score-a.score).slice(0,10);h+=`<div class="sec"><h2>${ind} › ${sub}　<small style="color:var(--mu)">Top ${r.length}</small></h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}
  m.innerHTML=h}
 function news(s){const a=['法人上修目標價，看好後市接單動能','外資買超，股價量能放大','公布最新月營收，年增表現受市場關注','宣布擴產計畫，產能預計逐步開出','產業供應鏈傳出新訂單消息'];const r=rng(s.r+new Date().getDate());
  return [0,1,2,3].map(i=>`<div class="news">${s.name}${a[Math.floor(r()*a.length)]}<br><small>${String(8+i*2).padStart(2,'0')}:${String(Math.floor(r()*59)).padStart(2,'0')} ・ 示範範例標題</small></div>`).join('')}
-function detail(key,range=90,tab=0){const s=S[key];if(!s)return;const r=rng(s.r+9),us=s.m=='US',d=new Date(),ex=new Date(+d+(10+Math.floor(r()*60))*864e5),pay=new Date(+ex+25*864e5),cash=us?(.2+r()*1.2):(.5+r()*6);
+function detail(key,range=90,tab=0){const s=S[key];if(!s)return;if(s.snap)return snapDetail(s);const r=rng(s.r+9),us=s.m=='US',d=new Date(),ex=new Date(+d+(10+Math.floor(r()*60))*864e5),pay=new Date(+ex+25*864e5),cash=us?(.2+r()*1.2):(.5+r()*6);
  const hi=Math.max(...s.k.map(x=>x.h)),lo=Math.min(...s.k.map(x=>x.l));
  const sig=[s.p>s.m5?'站上5日線':'跌破5日線',s.p>s.m20?'站上月線':'跌破月線',s.p>s.m60?'站上季線':'跌破季線',s.rsi>70?'RSI 過熱':s.rsi<30?'RSI 超賣':'RSI 中性',s.kd>80?'KD 高檔':s.kd<20?'KD 低檔':'KD 中性'];
  $('md').innerHTML=`<div class="row" style="justify-content:space-between"><div><b style="font-size:18px">${s.code} ${s.name}</b><br><span class="tag" style="margin:0">${us?'美股':'台股'} ・ ${s.i} › ${s.sub}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
@@ -171,5 +171,20 @@ function demoTick(){all().forEach(s=>{const l=s.k[s.k.length-1];if(Math.random()
 setInterval(async()=>{if(!liveOn)return;tk++;
  if(real){if(tk%20)return;await loadQuotes()}else demoTick();
  recalc();if($('ov').style.display!='block')render();else if(real&&cur&&cur[2]==0)detail(cur[0],cur[1],0)},3000);
-ind='🔥 全市場熱門';render();loadHistory();
+const MAP={'半導體業':'電子','電腦及週邊':'電子','光電業':'電子','通信網路':'電子','電子零組件':'電子','電子通路':'電子','資訊服務':'電子','其他電子':'電子','數位雲端':'電子','生技醫療':'生技醫療','航運業':'運輸','觀光餐旅':'百貨零售','貿易百貨':'百貨零售','居家生活':'百貨零售','電子商務':'百貨零售','運動休閒':'百貨零售','金融保險':'金融','建材營造':'營建','綠能環保':'綠能環保','ETF':'ETF','興櫃':'興櫃'};
+const USMAP={'Information Technology':'科技','Health Care':'生技醫療','Financials':'金融','Industrials':'工業運輸','Consumer Discretionary':'零售百貨','Consumer Staples':'零售百貨','Energy':'能源','Utilities':'公用事業','Materials':'原物料','Real Estate':'不動產','Communication Services':'通訊媒體','ETF':'ETF'};
+function snapDetail(s){const l=s.k[1],us=s.m=='US';
+ $('md').innerHTML=`<div class="row" style="justify-content:space-between"><div><b style="font-size:18px">${esc(s.code)} ${esc(s.name)}</b><br><span class="tag" style="margin:0">${us?'美股':'台股'} ・ ${esc(s.i)} › ${esc(s.sub)}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
+ <div style="font-size:26px;margin:6px 0" class="${cls(s,s.chg)}">${f2(s.p)} <small>${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</small></div>
+ <div class="kv"><div><b>開</b>${f2(l.o)}</div><div><b>高</b>${f2(l.h)}</div><div><b>低</b>${f2(l.l)}</div><div><b>昨收</b>${f2(s.pv)}</div><div><b>成交量</b>${fv(s)}</div></div>
+ <p style="color:var(--mu)">此股票目前只有最近交易日的行情；K 線、股利與新聞僅提供精選名單內的股票（下一階段會支援任意股票）。</p>`;
+ $('ov').style.display='block';$('md').onclick=e=>{if(e.target.id=='cl')$('ov').style.display='none'};cur=null}
+async function loadUniverse(){try{const u=await getJSON('universe.json');
+ const add=(m,x,mother,sub)=>{const key=m+x[0],c=x[7];if(S[key]||!c)return;const s={m,code:x[0],name:x[1],i:mother,sub,snap:1,r:hs(x[0]),k:[{t:'',o:c-x[8],h:c-x[8],l:c-x[8],c:c-x[8],v:0},{t:'',o:x[4],h:x[5],l:x[6],c,v:x[9]}]};
+  S[key]=s;const T=TREE[m][mother]||(TREE[m][mother]={});(T[sub]||(T[sub]=[])).push(s)};
+ (u.data.TW||[]).forEach(x=>add('TW',x,x[3]=='ETF'?'ETF':x[3]=='興櫃'?'興櫃':MAP[x[3]]||'傳產',x[3]=='興櫃'?'興櫃':x[3]));
+ (u.data.US||[]).forEach(x=>add('US',x,USMAP[x[2]]||x[2],x[3]));
+ for(const m of ['TW','US']){const a=all().filter(s=>s.snap&&s.m==m).sort((p,q)=>p.k[1].c*p.k[1].v-q.k[1].c*q.k[1].v);a.forEach((s,i)=>s.tp=i/a.length)}
+ recalc();render()}catch(e){console.warn('universe.json 載入失敗，只顯示精選名單',e)}}
+ind='🔥 全市場熱門';render();loadHistory();loadUniverse();
 </script></body></html>
