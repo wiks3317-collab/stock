@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "live / history / daily"
+        description: "live / history / daily / universe"
         default: "daily"
 permissions:
   contents: write
