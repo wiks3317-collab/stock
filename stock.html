@@ -6,45 +6,32 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E📈%3C/text%3E%3C/svg%3E">
 <title>股票資訊儀表板</title>
 <style>
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#6b7280;--bd:#e3e6ea;--ac:#2563eb;--up:#e5484d;--dn:#2fa36b}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101215;--card:#1a1d22;--tx:#e8eaed;--mu:#9aa0a8;--bd:#2c3037;--ac:#6ea0ff}}
-:root[data-theme="dark"]{--bg:#101215;--card:#1a1d22;--tx:#e8eaed;--mu:#9aa0a8;--bd:#2c3037;--ac:#6ea0ff}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 -apple-system,"PingFang TC","Microsoft JhengHei",sans-serif}
-header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--card);border-bottom:1px solid var(--bd);padding:10px 12px;z-index:5}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-h1{font-size:17px;margin:0 8px 0 0}
-button,input{font:inherit;color:var(--tx)}
-.chip{border:1px solid var(--bd);background:var(--card);padding:4px 11px;border-radius:16px;cursor:pointer;white-space:nowrap}
-.chip.on{background:var(--ac);border-color:var(--ac);color:#fff}
-input{border:1px solid var(--bd);background:var(--bg);border-radius:8px;padding:5px 9px;flex:1;min-width:120px}
-.scroll{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 2px}
-.note{margin:8px 12px;padding:8px 10px;border-radius:8px;background:var(--card);border:1px dashed var(--bd);color:var(--mu);font-size:12px}
-main{padding:0 12px 40px;max-width:980px;margin:auto}
-.sec{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin:12px 0;overflow:hidden}
-.sec h2{font-size:15px;margin:0;padding:10px 12px;border-bottom:1px solid var(--bd)}
-.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:430px}
-th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--bd)}
-th:first-child,td:first-child{text-align:left}th{color:var(--mu);font-weight:500;font-size:12px}
-tr.r{cursor:pointer}tr.r:hover{background:var(--bg)}
-.tag{font-size:11px;padding:0 6px;border-radius:8px;background:var(--bg);color:var(--mu);margin-left:4px}
-.star{cursor:pointer;color:var(--mu);margin-right:4px}.star.on{color:#f5a623}
-.up{color:var(--up)}.dn{color:var(--dn)}
-#ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:10;overflow:auto}
-#md{background:var(--card);max-width:860px;margin:env(safe-area-inset-top,0px) auto 0;min-height:100%;padding:12px}
-canvas{width:100%;height:340px;display:block}
-.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-.kv div{background:var(--bg);border-radius:8px;padding:8px}.kv b{display:block;font-size:12px;color:var(--mu);font-weight:500}
-.news{padding:8px 0;border-bottom:1px solid var(--bd)}.news small{color:var(--mu)}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light;--bg:#f6f7f9;--card:#fff;--tx:#1f2328;--mu:#6b7280;--bd:#d0d7de;--gut:#eef0f3;--ac:#2563eb;--up:#e5484d;--dn:#2fa36b;--prifg:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme]){color-scheme:dark;--bg:#0f1115;--card:#171a21;--tx:#e6e8eb;--mu:#9aa3af;--bd:#2d333b;--gut:#1e232b;--ac:#4c8dff;--up:#ff6b6b;--dn:#55c98a;--prifg:#fff}}
+html[data-theme=light]{color-scheme:light;--bg:#f6f7f9;--card:#fff;--tx:#1f2328;--mu:#6b7280;--bd:#d0d7de;--gut:#eef0f3;--ac:#2563eb;--up:#e5484d;--dn:#2fa36b;--prifg:#fff}
+html[data-theme=dark]{color-scheme:dark;--bg:#0f1115;--card:#171a21;--tx:#e6e8eb;--mu:#9aa3af;--bd:#2d333b;--gut:#1e232b;--ac:#4c8dff;--up:#ff6b6b;--dn:#55c98a;--prifg:#fff}
+html[data-theme=sepia]{color-scheme:light;--bg:#f1e8d4;--card:#fbf5e6;--tx:#3b3226;--mu:#7d705c;--bd:#d9cbaa;--gut:#efe4c9;--ac:#a8652a;--up:#b84a3a;--dn:#3f8a58;--prifg:#fff}
+html[data-theme=forest]{color-scheme:light;--bg:#eaf2ec;--card:#f8fcf9;--tx:#1d2b22;--mu:#5f7566;--bd:#c3d6c8;--gut:#dfeae2;--ac:#2f855a;--up:#c94b4b;--dn:#2f855a;--prifg:#fff}
+html[data-theme=ocean]{color-scheme:dark;--bg:#0b1e2d;--card:#10293c;--tx:#dbe9f4;--mu:#8fa9bd;--bd:#1f4059;--gut:#0d2335;--ac:#2bb3d9;--up:#ff6b6b;--dn:#55d6a0;--prifg:#04202c}
+html[data-theme=dracula]{color-scheme:dark;--bg:#1e1f29;--card:#282a36;--tx:#f8f8f2;--mu:#a0a4c0;--bd:#44475a;--gut:#2f3140;--ac:#bd93f9;--up:#ff6e6e;--dn:#50fa7b;--prifg:#1e1f29}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 -apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;transition:background-color .15s,color .15s}
+header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--card);border-bottom:1px solid var(--bd);padding:10px 12px;z-index:5}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}h1{font-size:17px;margin:0 8px 0 0}button,input{font:inherit;color:var(--tx)}
+.chip{border:1px solid var(--bd);background:var(--card);padding:4px 11px;border-radius:16px;cursor:pointer;white-space:nowrap}.chip.on{background:var(--ac);border-color:var(--ac);color:var(--prifg)}input{border:1px solid var(--bd);background:var(--bg);border-radius:8px;padding:5px 9px;flex:1;min-width:120px}.scroll{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 2px}
+.note{margin:8px 12px;padding:8px 10px;border-radius:8px;background:var(--card);border:1px dashed var(--bd);color:var(--mu);font-size:12px}main{padding:0 12px 40px;max-width:980px;margin:auto}.sec{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin:12px 0;overflow:hidden}.sec h2{font-size:15px;margin:0;padding:10px 12px;border-bottom:1px solid var(--bd)}
+.industry-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}.industry-grid .sec{margin:0;min-width:0}.industry-grid .tw{overflow:auto}.industry-grid table{min-width:0}@media(max-width:760px){.industry-grid{grid-template-columns:1fr}}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:430px}th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--bd)}th:first-child,td:first-child{text-align:left}th{color:var(--mu);font-weight:500;font-size:12px}tr.r{cursor:pointer}tr.r:hover{background:var(--bg)}.tag{font-size:11px;padding:0 6px;border-radius:8px;background:var(--bg);color:var(--mu);margin-left:4px}.star{cursor:pointer;color:var(--mu);margin-right:4px}.star.on{color:#f5a623}.up{color:var(--up)}.dn{color:var(--dn)}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:10;overflow:auto}#md{background:var(--card);max-width:860px;margin:env(safe-area-inset-top,0px) auto 0;min-height:100%;padding:12px}canvas{width:100%;height:340px;display:block}.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.kv div{background:var(--bg);border-radius:8px;padding:8px}.kv b{display:block;font-size:12px;color:var(--mu);font-weight:500}.news{padding:8px 0;border-bottom:1px solid var(--bd)}.news small{color:var(--mu)}
+.theme-box{display:flex;align-items:center;gap:6px;margin-left:auto}.theme-label{font-size:12px;color:var(--mu)}.theme-sw{width:21px;height:21px;border-radius:50%;padding:0;border:2px solid var(--bd);cursor:pointer;flex:0 0 auto}.theme-sw:hover{border-color:var(--ac)}.theme-sw.on{outline:2px solid var(--ac);outline-offset:2px}.theme-sw[data-t="light"]{background:#fff}.theme-sw[data-t="dark"]{background:#171a21}.theme-sw[data-t="sepia"]{background:#f1e8d4}.theme-sw[data-t="forest"]{background:#2f855a}.theme-sw[data-t="ocean"]{background:#10293c}.theme-sw[data-t="dracula"]{background:#bd93f9}.theme-sw[data-t="system"]{background:linear-gradient(135deg,#fff 50%,#171a21 50%)}
+@media(max-width:760px){.theme-box{width:100%;margin-left:0}.theme-label{display:none}.theme-sw{width:20px;height:20px}}
 </style></head><body>
 <header>
  <div class="row"><h1>📈 股票資訊</h1>
   <button class="chip on" id="mTW">台股</button><button class="chip" id="mUS">美股</button>
   <input id="q" placeholder="搜尋代號 / 名稱">
-  <button class="chip on" id="live">● 即時更新</button></div>
+  <button class="chip on" id="live">● 即時更新</button><div class="theme-box" aria-label="網頁顏色主題"><span class="theme-label">主題</span><button class="theme-sw" data-theme-choice="system" data-t="system" title="跟隨系統" aria-label="跟隨系統"></button><button class="theme-sw" data-theme-choice="light" data-t="light" title="亮色" aria-label="亮色"></button><button class="theme-sw" data-theme-choice="dark" data-t="dark" title="暗色" aria-label="暗色"></button><button class="theme-sw" data-theme-choice="sepia" data-t="sepia" title="復古暖色" aria-label="復古暖色"></button><button class="theme-sw" data-theme-choice="forest" data-t="forest" title="森林綠" aria-label="森林綠"></button><button class="theme-sw" data-theme-choice="ocean" data-t="ocean" title="海洋藍" aria-label="海洋藍"></button><button class="theme-sw" data-theme-choice="dracula" data-t="dracula" title="Dracula" aria-label="Dracula"></button></div></div>
  <div class="scroll" id="inds"></div>
 </header>
-<div class="note" id="note">⚠️ 目前為<b>示範模擬資料</b>（價格、量、新聞皆為程式產生，非真實行情）。已設計好資料結構，之後可把 <code>loadQuotes()</code> 換成真實 API 即可上線。</div>
+<div class="note" id="note">資料載入中：熱門/分類資料來自 GitHub Actions；盤中優先使用 Cloud Run + Yahoo Finance。若有第二來源，會顯示交叉比對結果。</div>
 <main id="main"></main>
 <div id="ov"><div id="md"></div></div>
 <script>
@@ -62,7 +49,7 @@ US:{
 "零售百貨":{"零售":"WMT Walmart,COST Costco,TGT Target,HD Home Depot,AMZN Amazon"},
 "金融":{"銀行支付":"JPM JPMorgan,BAC BofA,GS Goldman,MS Morgan Stanley,V Visa"}}};
 const $=id=>document.getElementById(id);
-let mkt='TW',ind='',q='',liveOn=true,fav=[];
+let mkt='TW',ind='',q='',liveOn=true,fav=[],searchTimer=null,searchSeq=0;
 try{fav=JSON.parse(localStorage.getItem('fav')||'[]')}catch(e){}
 const S={};
 function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -93,10 +80,10 @@ const th='<div class="tw"><table><tr><th>股票</th><th>現價</th><th>漲跌幅
 function render(){VIS=[];const m=$('main'),T=TREE[mkt];
  $('inds').innerHTML=['🔥 全市場熱門','⭐ 自選',...Object.keys(T)].map(x=>`<button class="chip ${x==ind?'on':''}" data-i="${x}">${x}</button>`).join('');
  let h='';
- if(q){const r=all().filter(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase())).slice(0,50);h=`<div class="sec"><h2>搜尋結果（${r.length}）</h2>${th}${r.map(s=>row(s)).join('')}</table></div></div>`}
- else if(ind=='🔥 全市場熱門'){const r=all().filter(s=>s.m==mkt).sort((a,b)=>b.score-a.score).slice(0,10);h=`<div class="sec"><h2>${mkt=='TW'?'台股':'美股'}全市場熱門 Top 10</h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}
+ if(q){const r=all().filter(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase())).slice(0,50);h=`<div class="sec"><h2>搜尋結果（${r.length}） <small style="color:var(--mu)">熱門/分類名單外亦會透過 Yahoo Finance 搜尋</small></h2>${th}${r.map(s=>row(s)).join('')}</table></div></div>`}
+ else if(ind=='🔥 全市場熱門'){const r=all().filter(s=>s.m==mkt).sort((a,b)=>b.score-a.score).slice(0,20);h=`<div class="sec"><h2>${mkt=='TW'?'台股':'美股'}全市場熱門 Top 20</h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}
  else if(ind=='⭐ 自選'){const r=all().filter(s=>fav.includes(s.m+s.code));h=`<div class="sec"><h2>自選股（${r.length}）</h2>${r.length?th+r.map(s=>row(s)).join('')+'</table></div>':'<p style="padding:12px;color:var(--mu)">點股票左側的 ☆ 加入自選</p>'}</div>`}
- else for(const sub in T[ind]){const r=[...T[ind][sub]].sort((a,b)=>b.score-a.score).slice(0,10);h+=`<div class="sec"><h2>${ind} › ${sub}　<small style="color:var(--mu)">Top ${r.length}</small></h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}
+ else {h='<div class="industry-grid">';for(const sub in T[ind]){const r=[...T[ind][sub]].sort((a,b)=>b.score-a.score).slice(0,10);h+=`<div class="sec"><h2>${ind} › ${sub}　<small style="color:var(--mu)">Top ${r.length}</small></h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}h+='</div>'}
  m.innerHTML=h}
 function news(s){const a=['法人上修目標價，看好後市接單動能','外資買超，股價量能放大','公布最新月營收，年增表現受市場關注','宣布擴產計畫，產能預計逐步開出','產業供應鏈傳出新訂單消息'];const r=rng(s.r+new Date().getDate());
  return [0,1,2,3].map(i=>`<div class="news">${s.name}${a[Math.floor(r()*a.length)]}<br><small>${String(8+i*2).padStart(2,'0')}:${String(Math.floor(r()*59)).padStart(2,'0')} ・ 示範範例標題</small></div>`).join('')}
@@ -105,6 +92,7 @@ function detail(key,range=90,tab=0){const s=S[key];if(!s)return;if(s.snap)return
  const sig=[s.p>s.m5?'站上5日線':'跌破5日線',s.p>s.m20?'站上月線':'跌破月線',s.p>s.m60?'站上季線':'跌破季線',s.rsi>70?'RSI 過熱':s.rsi<30?'RSI 超賣':'RSI 中性',s.kd>80?'KD 高檔':s.kd<20?'KD 低檔':'KD 中性'];
  $('md').innerHTML=`<div class="row" style="justify-content:space-between"><div><b style="font-size:18px">${s.code} ${s.name}</b><br><span class="tag" style="margin:0">${us?'美股':'台股'} ・ ${s.i} › ${s.sub}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
  <div style="font-size:26px;margin:6px 0" class="${cls(s,s.chg)}">${f2(s.p)} <small>${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</small></div>
+ ${s._sourceMeta?`<div class="note" style="margin:6px 0">行情：${esc(s._sourceMeta.quote||'Yahoo Finance')} ・ 抓取：${esc(s._sourceMeta.fetched||'—')} ${s._sourceMeta.compare?`・ 比對：${esc(s._sourceMeta.compare.status)}${s._sourceMeta.compare.message?' — '+esc(s._sourceMeta.compare.message):''}`:''}</div>`:''}
  <div class="row" style="margin-bottom:8px">${['技術分析','公司資訊 / 除權息','今日新聞'].map((t,i)=>`<button class="chip ${i==tab?'on':''}" data-t="${i}">${t}</button>`).join('')}</div>
  ${tab==0?`<div class="row" style="margin-bottom:6px">${[30,60,90,130].map(n=>`<button class="chip ${n==range?'on':''}" data-r="${n}">${n}日</button>`).join('')}<small style="color:var(--mu)"><span style="color:#f5a623">━</span> 5日 <span style="color:#4a90e2">━</span> 月線(20) <span style="color:#a855f7">━</span> 季線(60)</small></div><canvas id="cv"></canvas>
  <div class="kv" style="margin-top:8px"><div><b>5日線</b>${f2(s.m5)}</div><div><b>月線 (20)</b>${f2(s.m20)}</div><div><b>季線 (60)</b>${f2(s.m60)}</div><div><b>RSI(14)</b>${s.rsi.toFixed(1)}</div><div><b>KD 值(9)</b>${s.kd.toFixed(1)}</div><div><b>量比(對20日均量)</b>${s.vr.toFixed(2)}x</div></div>
@@ -127,6 +115,17 @@ function draw(s,range){const cv=$('cv'),dp=devicePixelRatio||1,W=cv.clientWidth,
   const vh=x.v/mv*60;c.globalAlpha=.55;c.fillRect(X(i)-bw*.35,H-vh-14,bw*.7,vh);c.globalAlpha=1;
   if(i%Math.ceil(D.length/6)==0){c.fillStyle=css.getPropertyValue('--mu');c.fillText(x.t,X(i)-12,H-2)}});
  [[5,'#f5a623'],[20,'#4a90e2'],[60,'#a855f7']].forEach(([n,cl])=>{c.strokeStyle=cl;c.lineWidth=1.4;c.beginPath();let on=0;for(let i=0;i<D.length;i++){const m=ma(k,n,st+i);if(m==null)continue;on?c.lineTo(X(i),Y(m)):c.moveTo(X(i),Y(m));on=1}c.stroke()});c.lineWidth=1}
+// 主題：與 index.html 共用相同主題名稱與配色邏輯
+const THEME_KEY='tools-theme';
+const THEME_VALUES=['system','light','dark','sepia','forest','ocean','dracula'];
+function applyTheme(v){
+ if(!THEME_VALUES.includes(v))v='system';
+ document.documentElement.dataset.theme=v==='system'?'':v;
+ document.querySelectorAll('.theme-sw').forEach(b=>b.classList.toggle('on',b.dataset.themeChoice===v));
+ try{localStorage.setItem(THEME_KEY,v)}catch(e){}
+}
+(function(){let v='system';try{v=localStorage.getItem(THEME_KEY)||localStorage.getItem('stock-theme')||localStorage.getItem('diff-theme')||'system'}catch(e){};window.addEventListener('DOMContentLoaded',()=>applyTheme(v))})();
+document.querySelectorAll('.theme-sw').forEach(b=>b.addEventListener('click',()=>applyTheme(b.dataset.themeChoice)));
 // events
 document.addEventListener('click',e=>{const t=e.target;
  if(t.dataset.f){const k=t.dataset.f;fav=fav.includes(k)?fav.filter(x=>x!=k):[...fav,k];try{localStorage.setItem('fav',JSON.stringify(fav))}catch(x){}render();e.stopPropagation();return}
@@ -135,8 +134,25 @@ document.addEventListener('click',e=>{const t=e.target;
 $('ov').addEventListener('click',e=>{if(e.target.id=='ov')$('ov').style.display='none'});
 function setM(m){mkt=m;ind='🔥 全市場熱門';$('mTW').classList.toggle('on',m=='TW');$('mUS').classList.toggle('on',m=='US');render()}
 $('mTW').onclick=()=>setM('TW');$('mUS').onclick=()=>setM('US');
-$('q').oninput=e=>{q=e.target.value.trim();render()};
+$('q').oninput=e=>{
+ q=e.target.value.trim();render();
+ clearTimeout(searchTimer);
+ const seq=++searchSeq;
+ if(q.length>=1)searchTimer=setTimeout(async()=>{if(seq!==searchSeq||!q)return;
+   const local=all().some(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase()));
+   if(local)return;
+   try{const d=await pget('/search?q='+encodeURIComponent(q));if(seq!==searchSeq||!q)return;
+     (d.data||[]).filter(x=>x.m==mkt).forEach(x=>{
+       if(S[x.key])return;
+       const s={m:x.m,code:x.code,name:x.name,i:'搜尋結果',sub:x.exchange||'其他',snap:1,r:hs(x.key),
+         k:[{t:'',o:0,h:0,l:0,c:0,v:0},{t:'',o:0,h:0,l:0,c:0,v:0}]};
+       S[x.key]=s;
+     });render();
+   }catch(err){console.warn('外部搜尋失敗',err)}
+ },350);
+};
 $('live').onclick=()=>{liveOn=!liveOn;$('live').classList.toggle('on',liveOn);$('live').textContent=(liveOn?'● ':'○ ')+'即時更新'};
+$('theme').onclick=cycleTheme;
 // 替換成真實 API：回傳 {代號:{price,volume}} 後更新 S[m+code].k 最後一根
 // 資料放在 repo 的 data 分支，經 raw.githubusercontent.com 讀取（支援跨網域，不需重新部署網站）
 // 自動由 xxx.github.io/repo/ 推算；自訂網域或推算錯誤時，把下一行改成 'https://raw.githubusercontent.com/帳號/repo名稱/data/'
@@ -153,13 +169,13 @@ function infoHtml(s,key){const D=DET[key],I=D.info||{},us=s.m=='US',dv=D.div||[]
  ${I.sum?`<p style="color:var(--mu)">${esc(I.sum)}${/^https?:/.test(I.web||'')?` <a href="${esc(I.web)}" target="_blank" rel="noopener">官網</a>`:''}</p>`:''}
  <h3>除息資料</h3><div class="kv"><div><b>近12個月現金股利</b>${D.ttm?nz(D.ttm,3):'—'}</div><div><b>殖利率（近12個月）</b>${D.ttm?(D.ttm/s.p*100).toFixed(2)+'%':'—'}</div></div>
  ${dv.length?`<div class="tw"><table style="min-width:0"><tr><th>除息日</th><th>現金股利</th></tr>${dv.map(x=>`<tr><td>${esc(x[0])}</td><td>${nz(x[1],3)}</td></tr>`).join('')}</table></div>`:'<p style="color:var(--mu)">查無股利紀錄</p>'}
- <small style="color:var(--mu)">來源 Yahoo Finance，僅含現金股利；股票股利與未來除權息日請以公司公告為準。公司簡介為原文（英文）。更新：${esc(DET_AT)}</small>`}
+ <small style="color:var(--mu)">公司資訊、K線與股利：Yahoo Finance。僅含現金股利；股票股利與未來除權息日請以公司公告為準。公司簡介為原文（英文）。抓取：${esc(DET_AT)}</small>`}
 function newsHtml(s,key){const a=NEWS[key];if(!a||!a.length)return news(s);const now=Date.now()/1000;
- return a.map(n=>`<div class="news">${/^https:/.test(n.u)?`<a href="${esc(n.u)}" target="_blank" rel="noopener" style="color:inherit">${esc(n.t)}</a>`:esc(n.t)}<br><small>${n.ts>now-86400?'<b style="color:var(--ac)">今日</b> ・ ':''}${esc(n.s)} ・ ${esc(n.d)}（台北時間）</small></div>`).join('')+`<small style="color:var(--mu)">來源：Google 新聞，更新 ${esc(NEWS_AT)}。若近兩日沒有新聞，會顯示近 7 天。</small>`}
+ return a.map(n=>`<div class="news">${/^https:/.test(n.u)?`<a href="${esc(n.u)}" target="_blank" rel="noopener" style="color:inherit">${esc(n.t)}</a>`:esc(n.t)}<br><small>${n.ts>now-86400?'<b style="color:var(--ac)">今日</b> ・ ':''}${esc(n.s)} ・ ${esc(n.d)}（台北時間）${n.srcs&&n.srcs.length>1?` ・ <b>多來源</b>：${esc(n.srcs.join(' + '))}`:''}</small></div>`).join('')+`<small style="color:var(--mu)">來源：Google 新聞 + Yahoo Finance RSS；系統會合併高度相似且時間接近的重複新聞。更新：${esc(NEWS_AT)}。</small>`}
 async function loadExtras(){let ok=0;
  try{const d=await getJSON('details.json');DET=d.data;DET_AT=d.updated;ok++}catch(e){console.warn('details.json',e)}
  try{const d=await getJSON('news.json');NEWS=d.data;NEWS_AT=d.updated;ok++}catch(e){console.warn('news.json',e)}
- $('note').innerHTML+=ok?'公司資訊、除息資料來自 Yahoo Finance，新聞來自 Google 新聞（每日更新；缺資料的個股顯示示範內容）。':'除權息、公司資訊、新聞為示範資料。'}
+ $('note').innerHTML+=ok?'公司資訊、除息資料來自 Yahoo Finance；新聞由 Google 新聞 + Yahoo Finance RSS 交叉整理。':'除權息、公司資訊、新聞暫無法取得。'}
 async function getJSON(f){const r=await fetch(DATA_URL+f+'?t='+Math.floor(Date.now()/6e4));if(!r.ok)throw new Error(f+' '+r.status);return r.json()}
 async function loadHistory(){try{const h=await getJSON('history.json');let n=0;
  for(const key in h.data){const s=S[key],a=h.data[key];if(!s||!a.length)continue;s.k=a.map(x=>({t:x[0],o:x[1],h:x[2],l:x[3],c:x[4],v:x[5]}));n++}
@@ -167,7 +183,9 @@ async function loadHistory(){try{const h=await getJSON('history.json');let n=0;
  $('note').innerHTML='資料來源：Yahoo Finance，由 GitHub Actions 定時抓取（可能有延遲）。K 線更新：'+h.updated+'。';loadExtras()}
  catch(e){console.warn('無法載入 history.json，維持示範資料',e)}}
 async function loadQuotes(){try{const q=await getJSON('live.json');
- for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;let l=s.k[s.k.length-1];
+ for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;
+  s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison||null};
+  let l=s.k[s.k.length-1];
   if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}
   else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('live.json 載入失敗',e)}}
 function demoTick(){all().forEach(s=>{const l=s.k[s.k.length-1];if(Math.random()<.5){l.c*=1+(Math.random()-.5)*.004;l.h=Math.max(l.h,l.c);l.l=Math.min(l.l,l.c);l.v*=1+Math.random()*.003}})}
@@ -180,7 +198,7 @@ function snapDetail(s){const l=s.k[1],us=s.m=='US';
  $('md').innerHTML=`<div class="row" style="justify-content:space-between"><div><b style="font-size:18px">${esc(s.code)} ${esc(s.name)}</b><br><span class="tag" style="margin:0">${us?'美股':'台股'} ・ ${esc(s.i)} › ${esc(s.sub)}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
  <div style="font-size:26px;margin:6px 0" class="${cls(s,s.chg)}">${f2(s.p)} <small>${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</small></div>
  <div class="kv"><div><b>開</b>${f2(l.o)}</div><div><b>高</b>${f2(l.h)}</div><div><b>低</b>${f2(l.l)}</div><div><b>昨收</b>${f2(s.pv)}</div><div><b>成交量</b>${fv(s)}</div></div>
- <p style="color:var(--mu)">此股票目前只有最近交易日的行情；K 線、股利與新聞僅提供精選名單內的股票（下一階段會支援任意股票）。</p>`;
+ <p style="color:var(--mu)">此股票先以搜尋/全市場名單資料顯示；開啟詳細頁後會由 Cloud Run 即時向 Yahoo Finance 取得 K 線、公司資訊與新聞，並以第二來源做價格交叉檢查。</p>`;
  $('ov').style.display='block';$('md').onclick=e=>{if(e.target.id=='cl')$('ov').style.display='none'};cur=null}
 async function loadUniverse(){try{const u=await getJSON('universe.json');
  const add=(m,x,mother,sub)=>{const key=m+x[0],c=x[7];if(S[key]||!c)return;const s={m,code:x[0],name:x[1],i:mother,sub,snap:1,r:hs(x[0]),k:[{t:'',o:c-x[8],h:c-x[8],l:c-x[8],c:c-x[8],v:0},{t:'',o:x[4],h:x[5],l:x[6],c,v:x[9]}]};
@@ -196,12 +214,15 @@ async function pget(p){const r=await fetch(PROXY_URL+p);if(!r.ok)throw new Error
 async function loadStock(s){snapDetail(s);const key=s.m+s.code;
  try{const d=await pget('/stock?key='+encodeURIComponent(key)+'&name='+encodeURIComponent(s.name));
   if(!d.k||!d.k.length)throw 0;
-  s.snap=0;s.k=d.k.map(x=>({t:x[0],o:x[1],h:x[2],l:x[3],c:x[4],v:x[5]}));DET[key]={div:d.div,ttm:d.ttm,info:d.info};NEWS[key]=d.news;ind_(s);detail(key)}
+  s.snap=0;s.k=d.k.map(x=>({t:x[0],o:x[1],h:x[2],l:x[3],c:x[4],v:x[5]}));DET[key]={div:d.div,ttm:d.ttm,info:d.info,sources:d.sources};NEWS[key]=d.news;
+  s._sourceMeta={quote:d.sources&&d.sources.quote?d.sources.quote.name:'Yahoo Finance',fetched:d.fetched_at||'',compare:null};
+  ind_(s);detail(key)}
  catch(e){$('md').insertAdjacentHTML('beforeend','<p style="color:var(--mu)">轉接服務載入失敗，請稍後再試。</p>')}}
 async function proxyQuotes(){const ks=[...new Set([...(cur?[cur[0]]:[]),...VIS])].slice(0,30);if(!ks.length)return;
  try{const q=await pget('/quote?keys='+ks.join(','));
   for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;
-   if(s.snap){const l=s.k[1];l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v;continue}
+   if(s.snap){const l=s.k[1];l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v;s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison||null};continue}
+   if(x.comparison)s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison};
    const l=s.k[s.k.length-1];if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('proxy quote',e)}}
 ind='🔥 全市場熱門';render();loadHistory();loadUniverse();
 </script></body></html>
