@@ -106,9 +106,9 @@ function detail(key,range=90,tab=0){const s=S[key];if(!s)return;const r=rng(s.r+
  ${tab==0?`<div class="row" style="margin-bottom:6px">${[30,60,90,130].map(n=>`<button class="chip ${n==range?'on':''}" data-r="${n}">${n}日</button>`).join('')}<small style="color:var(--mu)"><span style="color:#f5a623">━</span> 5日 <span style="color:#4a90e2">━</span> 月線(20) <span style="color:#a855f7">━</span> 季線(60)</small></div><canvas id="cv"></canvas>
  <div class="kv" style="margin-top:8px"><div><b>5日線</b>${f2(s.m5)}</div><div><b>月線 (20)</b>${f2(s.m20)}</div><div><b>季線 (60)</b>${f2(s.m60)}</div><div><b>RSI(14)</b>${s.rsi.toFixed(1)}</div><div><b>KD 值(9)</b>${s.kd.toFixed(1)}</div><div><b>量比(對20日均量)</b>${s.vr.toFixed(2)}x</div></div>
  <p><b>訊號：</b>${sig.join('、')}${s.bull?'、<b>多頭排列</b>':''}</p>`
- :tab==1?`<div class="kv"><div><b>產業</b>${s.i} / ${s.sub}</div><div><b>市值（示範）</b>${(us?(50+r()*3000).toFixed(0)+' 億美元':(300+r()*30000).toFixed(0)+' 億元')}</div><div><b>本益比</b>${(8+r()*30).toFixed(1)}</div><div><b>EPS（近四季）</b>${(s.p/(8+r()*30)).toFixed(2)}</div><div><b>${130}日最高</b>${f2(hi)}</div><div><b>${130}日最低</b>${f2(lo)}</div></div>
+ :tab==1&&DET[key]?infoHtml(s,key):tab==1?`<div class="kv"><div><b>產業</b>${s.i} / ${s.sub}</div><div><b>市值（示範）</b>${(us?(50+r()*3000).toFixed(0)+' 億美元':(300+r()*30000).toFixed(0)+' 億元')}</div><div><b>本益比</b>${(8+r()*30).toFixed(1)}</div><div><b>EPS（近四季）</b>${(s.p/(8+r()*30)).toFixed(2)}</div><div><b>${130}日最高</b>${f2(hi)}</div><div><b>${130}日最低</b>${f2(lo)}</div></div>
  <h3>除權息（示範）</h3><div class="kv"><div><b>${us?'每季現金股利':'現金股利'}</b>${cash.toFixed(2)}</div><div><b>${us?'':'股票股利'}</b>${us?'—':(r()>.8?'0.5':'0')}</div><div><b>除息日</b>${ex.toISOString().slice(0,10)}</div><div><b>發放日</b>${pay.toISOString().slice(0,10)}</div><div><b>殖利率</b>${(cash*(us?4:1)/s.p*100).toFixed(2)}%</div></div>`
- :news(s)}`;
+ :newsHtml(s,key)}`;
  $('ov').style.display='block';
  if(tab==0)draw(s,range);
  $('md').onclick=e=>{const t=e.target;if(t.id=='cl')$('ov').style.display='none';else if(t.dataset.t)detail(key,range,+t.dataset.t);else if(t.dataset.r)detail(key,+t.dataset.r,0)};cur=[key,range,tab]}
@@ -135,12 +135,33 @@ $('mTW').onclick=()=>setM('TW');$('mUS').onclick=()=>setM('US');
 $('q').oninput=e=>{q=e.target.value.trim();render()};
 $('live').onclick=()=>{liveOn=!liveOn;$('live').classList.toggle('on',liveOn);$('live').textContent=(liveOn?'● ':'○ ')+'即時更新'};
 // 替換成真實 API：回傳 {代號:{price,volume}} 後更新 S[m+code].k 最後一根
-const DATA_URL='data/';let real=false,tk=0;
-async function getJSON(f){const r=await fetch(DATA_URL+f+'?t='+Date.now());if(!r.ok)throw new Error(f+' '+r.status);return r.json()}
+// 資料放在 repo 的 data 分支，經 raw.githubusercontent.com 讀取（支援跨網域，不需重新部署網站）
+// 自動由 xxx.github.io/repo/ 推算；自訂網域或推算錯誤時，把下一行改成 'https://raw.githubusercontent.com/帳號/repo名稱/data/'
+const DATA_URL_OVERRIDE='';
+const DATA_URL=DATA_URL_OVERRIDE||(()=>{const h=location.hostname,p=location.pathname.split('/')[1];
+ if(h.endsWith('.github.io')){const o=h.split('.')[0];return 'https://raw.githubusercontent.com/'+o+'/'+(p&&!p.includes('.')?p:o+'.github.io')+'/data/'}
+ return 'data/'})();
+let real=false,tk=0,DET={},NEWS={},DET_AT='',NEWS_AT='';
+const esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cap=(v,us)=>v?(v>=1e12?(v/1e12).toFixed(2)+' 兆':(v/1e8).toFixed(0)+' 億')+(us?' 美元':' 元'):'—';
+const nz=(v,d=2)=>v==null?'—':Number(v).toFixed(d);
+function infoHtml(s,key){const D=DET[key],I=D.info||{},us=s.m=='US',dv=D.div||[];
+ return `<div class="kv"><div><b>產業</b>${esc(I.sector||s.i)}${I.industry?' / '+esc(I.industry):''}</div><div><b>市值</b>${cap(I.cap,us)}</div><div><b>本益比</b>${nz(I.pe,1)}</div><div><b>EPS</b>${nz(I.eps)}</div><div><b>52週高 / 低</b>${nz(I.hi)} / ${nz(I.lo)}</div><div><b>員工數</b>${I.emp?Number(I.emp).toLocaleString():'—'}</div></div>
+ ${I.sum?`<p style="color:var(--mu)">${esc(I.sum)}${/^https?:/.test(I.web||'')?` <a href="${esc(I.web)}" target="_blank" rel="noopener">官網</a>`:''}</p>`:''}
+ <h3>除息資料</h3><div class="kv"><div><b>近12個月現金股利</b>${D.ttm?nz(D.ttm,3):'—'}</div><div><b>殖利率（近12個月）</b>${D.ttm?(D.ttm/s.p*100).toFixed(2)+'%':'—'}</div></div>
+ ${dv.length?`<div class="tw"><table style="min-width:0"><tr><th>除息日</th><th>現金股利</th></tr>${dv.map(x=>`<tr><td>${esc(x[0])}</td><td>${nz(x[1],3)}</td></tr>`).join('')}</table></div>`:'<p style="color:var(--mu)">查無股利紀錄</p>'}
+ <small style="color:var(--mu)">來源 Yahoo Finance，僅含現金股利；股票股利與未來除權息日請以公司公告為準。公司簡介為原文（英文）。更新：${esc(DET_AT)}</small>`}
+function newsHtml(s,key){const a=NEWS[key];if(!a||!a.length)return news(s);const now=Date.now()/1000;
+ return a.map(n=>`<div class="news">${/^https:/.test(n.u)?`<a href="${esc(n.u)}" target="_blank" rel="noopener" style="color:inherit">${esc(n.t)}</a>`:esc(n.t)}<br><small>${n.ts>now-86400?'<b style="color:var(--ac)">今日</b> ・ ':''}${esc(n.s)} ・ ${esc(n.d)}（台北時間）</small></div>`).join('')+`<small style="color:var(--mu)">來源：Google 新聞，更新 ${esc(NEWS_AT)}。若近兩日沒有新聞，會顯示近 7 天。</small>`}
+async function loadExtras(){let ok=0;
+ try{const d=await getJSON('details.json');DET=d.data;DET_AT=d.updated;ok++}catch(e){console.warn('details.json',e)}
+ try{const d=await getJSON('news.json');NEWS=d.data;NEWS_AT=d.updated;ok++}catch(e){console.warn('news.json',e)}
+ $('note').innerHTML+=ok?'公司資訊、除息資料來自 Yahoo Finance，新聞來自 Google 新聞（每日更新；缺資料的個股顯示示範內容）。':'除權息、公司資訊、新聞為示範資料。'}
+async function getJSON(f){const r=await fetch(DATA_URL+f+'?t='+Math.floor(Date.now()/6e4));if(!r.ok)throw new Error(f+' '+r.status);return r.json()}
 async function loadHistory(){try{const h=await getJSON('history.json');let n=0;
  for(const key in h.data){const s=S[key],a=h.data[key];if(!s||!a.length)continue;s.k=a.map(x=>({t:x[0],o:x[1],h:x[2],l:x[3],c:x[4],v:x[5]}));n++}
  real=n>0;recalc();render();
- $('note').innerHTML='資料來源：Yahoo Finance，由 GitHub Actions 定時抓取（可能有延遲）。K 線更新：'+h.updated+'。除權息、公司資訊、新聞仍為示範資料。'}
+ $('note').innerHTML='資料來源：Yahoo Finance，由 GitHub Actions 定時抓取（可能有延遲）。K 線更新：'+h.updated+'。';loadExtras()}
  catch(e){console.warn('無法載入 history.json，維持示範資料',e)}}
 async function loadQuotes(){try{const q=await getJSON('live.json');
  for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;let l=s.k[s.k.length-1];
