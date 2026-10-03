@@ -17,8 +17,8 @@ html[data-theme=dracula]{color-scheme:dark;--bg:#1e1f29;--card:#282a36;--tx:#f8f
 html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 -apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;transition:background-color .15s,color .15s}
 header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--card);border-bottom:1px solid var(--bd);padding:10px 12px;z-index:5}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}h1{font-size:17px;margin:0 8px 0 0}button,input{font:inherit;color:var(--tx)}
 .chip{border:1px solid var(--bd);background:var(--card);padding:4px 11px;border-radius:16px;cursor:pointer;white-space:nowrap}.chip.on{background:var(--ac);border-color:var(--ac);color:var(--prifg)}input{border:1px solid var(--bd);background:var(--bg);border-radius:8px;padding:5px 9px;flex:1;min-width:120px}.scroll{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 2px}
-.note{margin:8px 12px;padding:8px 10px;border-radius:8px;background:var(--card);border:1px dashed var(--bd);color:var(--mu);font-size:12px}main{padding:0 12px 40px;max-width:980px;margin:auto}.sec{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin:12px 0;overflow:hidden}.sec h2{font-size:15px;margin:0;padding:10px 12px;border-bottom:1px solid var(--bd)}
-.industry-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin:12px 0}.industry-grid .sec{margin:0;min-width:0;width:100%;overflow:hidden}.industry-grid .tw{overflow-x:hidden}.industry-grid table{width:100%;min-width:0;table-layout:fixed}.industry-grid th,.industry-grid td{overflow-wrap:anywhere;word-break:break-word}.industry-grid th:first-child,.industry-grid td:first-child{width:22%}.industry-grid th:nth-child(2),.industry-grid td:nth-child(2){width:34%}.industry-grid th:nth-child(3),.industry-grid td:nth-child(3){width:22%}.industry-grid th:nth-child(4),.industry-grid td:nth-child(4){width:22%}@media(max-width:760px){.industry-grid{grid-template-columns:1fr;gap:10px}.industry-grid .tw{overflow-x:auto}.industry-grid table{table-layout:auto;min-width:520px}}
+.note{margin:8px 12px;padding:8px 10px;border-radius:8px;background:var(--card);border:1px dashed var(--bd);color:var(--mu);font-size:12px}main{padding:0 12px 40px;max-width:1600px;margin:auto}.sec{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin:12px 0;overflow:hidden}.sec h2{font-size:15px;margin:0;padding:10px 12px;border-bottom:1px solid var(--bd)}
+.industry-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin:12px 0}.industry-grid .sec{margin:0;min-width:0;width:100%;overflow:hidden}.industry-grid .tw{overflow-x:hidden}.industry-grid table{width:100%;min-width:0;table-layout:fixed}.industry-grid th,.industry-grid td{overflow:hidden;text-overflow:ellipsis}.industry-grid th:first-child,.industry-grid td:first-child{width:34%;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.industry-grid th:nth-child(2),.industry-grid td:nth-child(2){width:16%}.industry-grid th:nth-child(3),.industry-grid td:nth-child(3){width:18%}.industry-grid th:nth-child(4),.industry-grid td:nth-child(4){width:20%}.industry-grid th:nth-child(5),.industry-grid td:nth-child(5){width:12%}@media(max-width:380px){.industry-grid{grid-template-columns:1fr;gap:10px}.industry-grid .tw{overflow-x:auto}.industry-grid table{table-layout:auto;min-width:430px}}
 .tw{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:430px}th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--bd)}th:first-child,td:first-child{text-align:left}th{color:var(--mu);font-weight:500;font-size:12px}tr.r{cursor:pointer}tr.r:hover{background:var(--bg)}.tag{font-size:11px;padding:0 6px;border-radius:8px;background:var(--bg);color:var(--mu);margin-left:4px}.star{cursor:pointer;color:var(--mu);margin-right:4px}.star.on{color:#f5a623}.up{color:var(--up)}.dn{color:var(--dn)}
 #ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:10;overflow:auto}#md{background:var(--card);max-width:860px;margin:env(safe-area-inset-top,0px) auto 0;min-height:100%;padding:12px}canvas{width:100%;height:340px;display:block}.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.kv div{background:var(--bg);border-radius:8px;padding:8px}.kv b{display:block;font-size:12px;color:var(--mu);font-weight:500}.news{padding:8px 0;border-bottom:1px solid var(--bd)}.news small{color:var(--mu)}
 .theme-box{display:flex;align-items:center;gap:6px;margin-left:auto}.theme-label{font-size:12px;color:var(--mu)}.theme-sw{width:21px;height:21px;border-radius:50%;padding:0;border:2px solid var(--bd);cursor:pointer;flex:0 0 auto}.theme-sw:hover{border-color:var(--ac)}.theme-sw.on{outline:2px solid var(--ac);outline-offset:2px}.theme-sw[data-t="light"]{background:#fff}.theme-sw[data-t="dark"]{background:#171a21}.theme-sw[data-t="sepia"]{background:#f1e8d4}.theme-sw[data-t="forest"]{background:#2f855a}.theme-sw[data-t="ocean"]{background:#10293c}.theme-sw[data-t="dracula"]{background:#bd93f9}.theme-sw[data-t="system"]{background:linear-gradient(135deg,#fff 50%,#171a21 50%)}
@@ -83,7 +83,7 @@ function render(){VIS=[];const m=$('main'),T=TREE[mkt];
  if(q){const r=all().filter(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase())).slice(0,50);h=`<div class="sec"><h2>搜尋結果（${r.length}） <small style="color:var(--mu)">熱門/分類名單外亦會透過 Yahoo Finance 搜尋</small></h2>${th}${r.map(s=>row(s)).join('')}</table></div></div>`}
  else if(ind=='🔥 全市場熱門'){const r=all().filter(s=>s.m==mkt).sort((a,b)=>b.score-a.score).slice(0,20);h=`<div class="sec"><h2>${mkt=='TW'?'台股':'美股'}全市場熱門 Top 20</h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}
  else if(ind=='⭐ 自選'){const r=all().filter(s=>fav.includes(s.m+s.code));h=`<div class="sec"><h2>自選股（${r.length}）</h2>${r.length?th+r.map(s=>row(s)).join('')+'</table></div>':'<p style="padding:12px;color:var(--mu)">點股票左側的 ☆ 加入自選</p>'}</div>`}
- else {h='<div class="industry-grid">';for(const sub in T[ind]){const r=[...T[ind][sub]].sort((a,b)=>b.score-a.score).slice(0,10);h+=`<div class="sec"><h2>${ind} › ${sub}　<small style="color:var(--mu)">Top ${r.length}</small></h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}h+='</div>'}
+ else {h='<div class="industry-grid">';const groups=T[ind]||{};for(const sub in groups){const r=[...groups[sub]].filter(s=>s&&s.m==mkt).sort((a,b)=>b.score-a.score).slice(0,10);if(!r.length)continue;h+=`<div class="sec"><h2>${ind} › ${sub}　<small style="color:var(--mu)">Top ${r.length}</small></h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}if(!h.includes('class="sec"'))h+='<div class="sec"><p style="padding:12px;color:var(--mu)">目前沒有可顯示的分類資料。</p></div>';h+='</div>'}
  m.innerHTML=h}
 function news(s){const a=['法人上修目標價，看好後市接單動能','外資買超，股價量能放大','公布最新月營收，年增表現受市場關注','宣布擴產計畫，產能預計逐步開出','產業供應鏈傳出新訂單消息'];const r=rng(s.r+new Date().getDate());
  return [0,1,2,3].map(i=>`<div class="news">${s.name}${a[Math.floor(r()*a.length)]}<br><small>${String(8+i*2).padStart(2,'0')}:${String(Math.floor(r()*59)).padStart(2,'0')} ・ 示範範例標題</small></div>`).join('')}
@@ -199,13 +199,29 @@ function snapDetail(s){const l=s.k[1],us=s.m=='US';
  <div class="kv"><div><b>開</b>${f2(l.o)}</div><div><b>高</b>${f2(l.h)}</div><div><b>低</b>${f2(l.l)}</div><div><b>昨收</b>${f2(s.pv)}</div><div><b>成交量</b>${fv(s)}</div></div>
  <p style="color:var(--mu)">此股票先以搜尋/全市場名單資料顯示；開啟詳細頁後會由 Cloud Run 即時向 Yahoo Finance 取得 K 線、公司資訊與新聞，並以第二來源做價格交叉檢查。</p>`;
  $('ov').style.display='block';$('md').onclick=e=>{if(e.target.id=='cl')$('ov').style.display='none'};cur=null}
+function rebuildDynamicTree(){
+ const next={TW:{},US:{}};
+ for(const m of ['TW','US']){
+  const market=all().filter(s=>s.m==m);
+  for(const s of market){
+   if(!s.i||!s.sub)continue;
+   const i=s.i,sub=s.sub;
+   (next[m][i]||(next[m][i]={}))[sub]||(next[m][i][sub]=[]);
+   next[m][i][sub].push(s);
+  }
+ }
+ // 保留「精選分類」名稱，但股票內容完全以目前市場 universe 為準。
+ // RAW 只作為 universe 尚未載入時的初始畫面，不再主導正式分類資料。
+ TREE.TW=next.TW;TREE.US=next.US;
+}
 async function loadUniverse(){try{const u=await getJSON('universe.json');
  const add=(m,x,mother,sub)=>{const key=m+x[0],c=x[7];if(S[key]||!c)return;const s={m,code:x[0],name:x[1],i:mother,sub,snap:1,r:hs(x[0]),k:[{t:'',o:c-x[8],h:c-x[8],l:c-x[8],c:c-x[8],v:0},{t:'',o:x[4],h:x[5],l:x[6],c,v:x[9]}]};
-  S[key]=s;const T=TREE[m][mother]||(TREE[m][mother]={});(T[sub]||(T[sub]=[])).push(s)};
+  S[key]=s};
  (u.data.TW||[]).forEach(x=>add('TW',x,x[3]=='ETF'?'ETF':x[3]=='興櫃'?'興櫃':MAP[x[3]]||'傳產',x[3]=='興櫃'?'興櫃':x[3]));
  (u.data.US||[]).forEach(x=>add('US',x,USMAP[x[2]]||x[2],x[3]));
- for(const m of ['TW','US']){const a=all().filter(s=>s.snap&&s.m==m).sort((p,q)=>p.k[1].c*p.k[1].v-q.k[1].c*q.k[1].v);a.forEach((s,i)=>s.tp=i/a.length)}
- recalc();render()}catch(e){console.warn('universe.json 載入失敗，只顯示精選名單',e)}}
+ for(const m of ['TW','US']){const a=all().filter(s=>s.snap&&s.m==m).sort((p,q)=>p.k[1].c*p.k[1].v-q.k[1].c*q.k[1].v);a.forEach((s,i)=>s.tp=i/(a.length||1))}
+ rebuildDynamicTree();recalc();render()
+ }catch(e){console.warn('universe.json 載入失敗，只顯示精選名單',e)}}
 // 部署 Cloud Run 後，把服務網址貼在下一行（結尾不要加 /）；留空則只用 GitHub 排程資料
 const PROXY_URL='https://stock-proxy-885754386445.asia-east1.run.app';
 let VIS=[];
