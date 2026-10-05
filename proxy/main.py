@@ -150,16 +150,18 @@ def yahoo_live(keys):
                    "l": r(x.Low), "p": r(x.Close), "v": vol(k[:2], x.Volume), "date": date}
     return data
 
-def live(keys):
+def live(keys, cmp=()):
     checked = now_tw()
     ydata = yahoo_live(keys)
     data = {}
     for k, y in ydata.items():
-        secondary = official_tw_quote(k[2:]) if k[:2] == "TW" else stooq_quote(k[2:])
+        secondary = (official_tw_quote(k[2:]) if k[:2] == "TW" else stooq_quote(k[2:])) if k in cmp else None  # 第二來源很慢，只在開啟個股時才查
         y["sources"] = [{"name": "Yahoo Finance", "role": "主要", "time": checked}]
         if secondary:
             y["sources"].append({"name": secondary["source"], "role": "比對", "time": secondary["time"],
                                  "date": secondary.get("date")})
+        if k not in cmp:
+            data[k] = y; continue
         y["comparison"] = compare_quote({"p": y["p"], "date": y["date"]}, secondary,
                                         "Yahoo Finance", secondary.get("source", "第二來源") if secondary else "第二來源")
         data[k] = y
@@ -172,7 +174,8 @@ def quote():
     keys = sorted({k for k in request.args.get("keys", "").split(",") if KEY.match(k)})[:30]
     if not keys:
         return jsonify(error="no keys"), 400
-    resp = jsonify(cached("q" + ",".join(keys), 15, lambda: live(keys)))
+    cmp = {k for k in request.args.get("cmp", "").split(",") if KEY.match(k)}
+    resp = jsonify(cached("q" + ",".join(keys) + "|" + ",".join(sorted(cmp)), 15, lambda: live(keys, cmp)))
     resp.headers["Cache-Control"] = "public, max-age=10"
     return resp
 
