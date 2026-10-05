@@ -18,7 +18,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}bod
 header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--card);border-bottom:1px solid var(--bd);padding:10px 12px;z-index:5}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}h1{font-size:17px;margin:0 8px 0 0}button,input{font:inherit;color:var(--tx)}
 .chip{border:1px solid var(--bd);background:var(--card);padding:4px 11px;border-radius:16px;cursor:pointer;white-space:nowrap}.chip.on{background:var(--ac);border-color:var(--ac);color:var(--prifg)}input{border:1px solid var(--bd);background:var(--bg);border-radius:8px;padding:5px 9px;flex:1;min-width:120px}.scroll{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 2px}
 .note{margin:8px 12px;padding:8px 10px;border-radius:8px;background:var(--card);border:1px dashed var(--bd);color:var(--mu);font-size:12px}main{padding:0 12px 40px;max-width:1600px;margin:auto}.sec{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin:12px 0;overflow:hidden}.sec h2{font-size:15px;margin:0;padding:10px 12px;border-bottom:1px solid var(--bd)}
-.industry-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin:12px 0}.industry-grid .sec{margin:0;min-width:0;width:100%;overflow:hidden}.industry-grid .tw{overflow-x:hidden}.industry-grid table{width:100%;min-width:0;table-layout:fixed}.industry-grid th,.industry-grid td{overflow:hidden;text-overflow:ellipsis}.industry-grid th:first-child,.industry-grid td:first-child{width:34%;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.industry-grid th:nth-child(2),.industry-grid td:nth-child(2){width:16%}.industry-grid th:nth-child(3),.industry-grid td:nth-child(3){width:18%}.industry-grid th:nth-child(4),.industry-grid td:nth-child(4){width:20%}.industry-grid th:nth-child(5),.industry-grid td:nth-child(5){width:12%}@media(max-width:380px){.industry-grid{grid-template-columns:1fr;gap:10px}.industry-grid .tw{overflow-x:auto}.industry-grid table{table-layout:auto;min-width:430px}}
+.industry-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(340px,calc((100% - 28px)/3)),1fr));gap:14px;margin:12px 0}.industry-grid .sec{margin:0;min-width:0;width:100%;overflow:hidden}.industry-grid .tw{overflow-x:hidden}.industry-grid table{width:100%;min-width:0;table-layout:fixed}.industry-grid th,.industry-grid td{overflow:hidden;text-overflow:ellipsis}.industry-grid th:first-child,.industry-grid td:first-child{width:34%;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.industry-grid th:nth-child(2),.industry-grid td:nth-child(2){width:16%}.industry-grid th:nth-child(3),.industry-grid td:nth-child(3){width:18%}.industry-grid th:nth-child(4),.industry-grid td:nth-child(4){width:20%}.industry-grid th:nth-child(5),.industry-grid td:nth-child(5){width:12%}@media(max-width:380px){.industry-grid{grid-template-columns:1fr;gap:10px}.industry-grid .tw{overflow-x:auto}.industry-grid table{table-layout:auto;min-width:430px}}
 .tw{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:430px}th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--bd)}th:first-child,td:first-child{text-align:left}th{color:var(--mu);font-weight:500;font-size:12px}tr.r{cursor:pointer}tr.r:hover{background:var(--bg)}.tag{font-size:11px;padding:0 6px;border-radius:8px;background:var(--bg);color:var(--mu);margin-left:4px}.star{cursor:pointer;color:var(--mu);margin-right:4px}.star.on{color:#f5a623}.up{color:var(--up)}.dn{color:var(--dn)}
 #ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:10;overflow:auto}#md{background:var(--card);max-width:860px;margin:env(safe-area-inset-top,0px) auto 0;min-height:100%;padding:12px}canvas{width:100%;height:340px;display:block}.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.kv div{background:var(--bg);border-radius:8px;padding:8px}.kv b{display:block;font-size:12px;color:var(--mu);font-weight:500}.news{padding:8px 0;border-bottom:1px solid var(--bd)}.news small{color:var(--mu)}
 .theme-box{display:flex;align-items:center;gap:6px;margin-left:auto}.theme-label{font-size:12px;color:var(--mu)}.theme-sw{width:21px;height:21px;border-radius:50%;padding:0;border:2px solid var(--bd);cursor:pointer;flex:0 0 auto}.theme-sw:hover{border-color:var(--ac)}.theme-sw.on{outline:2px solid var(--ac);outline-offset:2px}.theme-sw[data-t="light"]{background:#fff}.theme-sw[data-t="dark"]{background:#171a21}.theme-sw[data-t="sepia"]{background:#f1e8d4}.theme-sw[data-t="forest"]{background:#2f855a}.theme-sw[data-t="ocean"]{background:#10293c}.theme-sw[data-t="dracula"]{background:#bd93f9}.theme-sw[data-t="system"]{background:linear-gradient(135deg,#fff 50%,#171a21 50%)}
@@ -28,7 +28,7 @@ header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--card);b
  <div class="row"><h1>📈 股票資訊</h1>
   <button class="chip on" id="mTW">台股</button><button class="chip" id="mUS">美股</button>
   <input id="q" placeholder="搜尋代號 / 名稱">
-  <button class="chip on" id="live">● 即時更新</button><div class="theme-box" aria-label="網頁顏色主題"><span class="theme-label">主題</span><button class="theme-sw" data-theme-choice="system" data-t="system" title="跟隨系統" aria-label="跟隨系統"></button><button class="theme-sw" data-theme-choice="light" data-t="light" title="亮色" aria-label="亮色"></button><button class="theme-sw" data-theme-choice="dark" data-t="dark" title="暗色" aria-label="暗色"></button><button class="theme-sw" data-theme-choice="sepia" data-t="sepia" title="復古暖色" aria-label="復古暖色"></button><button class="theme-sw" data-theme-choice="forest" data-t="forest" title="森林綠" aria-label="森林綠"></button><button class="theme-sw" data-theme-choice="ocean" data-t="ocean" title="海洋藍" aria-label="海洋藍"></button><button class="theme-sw" data-theme-choice="dracula" data-t="dracula" title="Dracula" aria-label="Dracula"></button></div></div>
+  <button class="chip on" id="live">● 即時更新</button><span id="stamp" style="color:var(--mu);font-size:12px"></span><div class="theme-box" aria-label="網頁顏色主題"><span class="theme-label">主題</span><button class="theme-sw" data-theme-choice="system" data-t="system" title="跟隨系統" aria-label="跟隨系統"></button><button class="theme-sw" data-theme-choice="light" data-t="light" title="亮色" aria-label="亮色"></button><button class="theme-sw" data-theme-choice="dark" data-t="dark" title="暗色" aria-label="暗色"></button><button class="theme-sw" data-theme-choice="sepia" data-t="sepia" title="復古暖色" aria-label="復古暖色"></button><button class="theme-sw" data-theme-choice="forest" data-t="forest" title="森林綠" aria-label="森林綠"></button><button class="theme-sw" data-theme-choice="ocean" data-t="ocean" title="海洋藍" aria-label="海洋藍"></button><button class="theme-sw" data-theme-choice="dracula" data-t="dracula" title="Dracula" aria-label="Dracula"></button></div></div>
  <div class="scroll" id="inds"></div>
 </header>
 <div class="note" id="note">資料載入中：熱門/分類資料來自 GitHub Actions；盤中優先使用 Cloud Run + Yahoo Finance。若有第二來源，會顯示交叉比對結果。</div>
@@ -181,7 +181,7 @@ async function loadHistory(){try{const h=await getJSON('history.json');let n=0;
  real=n>0;recalc();render();
  $('note').innerHTML='資料來源：Yahoo Finance，由 GitHub Actions 定時抓取（可能有延遲）。K 線更新：'+h.updated+'。';loadExtras()}
  catch(e){console.warn('無法載入 history.json，維持示範資料',e)}}
-async function loadQuotes(){try{const q=await getJSON('live.json');
+async function loadQuotes(){try{const q=await getJSON('live.json');stamp('排程資料（GitHub Actions）',q.updated);
  for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;
   s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison||null};
   let l=s.k[s.k.length-1];
@@ -189,7 +189,7 @@ async function loadQuotes(){try{const q=await getJSON('live.json');
   else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('live.json 載入失敗',e)}}
 function demoTick(){all().forEach(s=>{const l=s.k[s.k.length-1];if(Math.random()<.5){l.c*=1+(Math.random()-.5)*.004;l.h=Math.max(l.h,l.c);l.l=Math.min(l.l,l.c);l.v*=1+Math.random()*.003}})}
 setInterval(async()=>{if(!liveOn)return;tk++;
- if(PROXY_URL){if(tk%5)return;await proxyQuotes()}else if(real){if(tk%20)return;await loadQuotes()}else demoTick();
+ if(PROXY_URL){if(tk%5)return;if(!await proxyQuotes()&&real&&tk%20==0)await loadQuotes()}else if(real){if(tk%20)return;await loadQuotes()}else demoTick();
  recalc();if($('ov').style.display!='block')render();else if((real||PROXY_URL)&&cur&&cur[2]==0)detail(cur[0],cur[1],0)},3000);
 const MAP={'半導體業':'電子','電腦及週邊':'電子','光電業':'電子','通信網路':'電子','電子零組件':'電子','電子通路':'電子','資訊服務':'電子','其他電子':'電子','數位雲端':'電子','生技醫療':'生技醫療','航運業':'運輸','觀光餐旅':'百貨零售','貿易百貨':'百貨零售','居家生活':'百貨零售','電子商務':'百貨零售','運動休閒':'百貨零售','金融保險':'金融','建材營造':'營建','綠能環保':'綠能環保','ETF':'ETF','興櫃':'興櫃'};
 const USMAP={'Information Technology':'科技','Health Care':'生技醫療','Financials':'金融','Industrials':'工業運輸','Consumer Discretionary':'零售百貨','Consumer Staples':'零售百貨','Energy':'能源','Utilities':'公用事業','Materials':'原物料','Real Estate':'不動產','Communication Services':'通訊媒體','ETF':'ETF'};
@@ -225,6 +225,7 @@ async function loadUniverse(){try{const u=await getJSON('universe.json');
 // 部署 Cloud Run 後，把服務網址貼在下一行（結尾不要加 /）；留空則只用 GitHub 排程資料
 const PROXY_URL='https://stock-proxy-885754386445.asia-east1.run.app';
 let VIS=[];
+function stamp(src,t,warn){const e=$('stamp');if(!e)return;const n=new Date(),p=x=>String(x).padStart(2,'0');e.style.color=warn?'#e5484d':'';e.textContent=(warn?'':'🕒 ')+src+'・最新抓取 '+(t||'—')+'・畫面刷新 '+p(n.getHours())+':'+p(n.getMinutes())+':'+p(n.getSeconds())}
 async function pget(p){const r=await fetch(PROXY_URL+p);if(!r.ok)throw new Error(r.status);return r.json()}
 async function loadStock(s){snapDetail(s);const key=s.m+s.code;
  try{const d=await pget('/stock?key='+encodeURIComponent(key)+'&name='+encodeURIComponent(s.name));
@@ -233,11 +234,11 @@ async function loadStock(s){snapDetail(s);const key=s.m+s.code;
   s._sourceMeta={quote:d.sources&&d.sources.quote?d.sources.quote.name:'Yahoo Finance',fetched:d.fetched_at||'',compare:null};
   ind_(s);detail(key)}
  catch(e){$('md').insertAdjacentHTML('beforeend','<p style="color:var(--mu)">轉接服務載入失敗，請稍後再試。</p>')}}
-async function proxyQuotes(){const ks=[...new Set([...(cur?[cur[0]]:[]),...VIS])].slice(0,30);if(!ks.length)return;
- try{const q=await pget('/quote?keys='+ks.join(','));
+async function proxyQuotes(){const ks=[...new Set([...(cur?[cur[0]]:[]),...VIS])].slice(0,30);if(!ks.length)return true;
+ try{const q=await pget('/quote?keys='+ks.join(',')+(cur?'&cmp='+cur[0]:''));stamp('即時報價（Cloud Run／Yahoo）',q.updated);
   for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;
    if(s.snap){const l=s.k[1];l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v;s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison||null};continue}
    if(x.comparison)s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison};
-   const l=s.k[s.k.length-1];if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('proxy quote',e)}}
+   const l=s.k[s.k.length-1];if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('proxy quote',e);stamp('⚠️ 即時報價連線失敗，改用排程資料',null,1);return false}return true}
 ind='🔥 全市場熱門';render();loadHistory();loadUniverse();
 </script></body></html>
