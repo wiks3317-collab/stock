@@ -169,13 +169,42 @@ def live(keys, cmp=()):
             "source_policy": "Yahoo Finance 為主要來源；第二來源僅作交叉檢查"}
 
 
+QC = {}  # 逐檔報價快取：開盤中 15 秒、休市 10 分鐘，不同畫面重複查同一檔不會再打 Yahoo
+
+def mkt_open(m):
+    try:
+        from zoneinfo import ZoneInfo
+        n = dt.datetime.now(ZoneInfo("Asia/Taipei" if m == "TW" else "America/New_York"))
+        a, b = (535, 815) if m == "TW" else (565, 965)
+        return n.weekday() < 5 and a <= n.hour * 60 + n.minute <= b
+    except Exception:
+        return True
+
+def live_cached(keys, cmp=()):
+    now, out, need = time.time(), {}, []
+    for k in keys:
+        h = QC.get(k)
+        if h and k not in cmp and now - h[0] < (15 if mkt_open(k[:2]) else 600):
+            out[k] = h[1]
+        else:
+            need.append(k)
+    if need:
+        res = live(need, cmp)
+        if len(QC) > 3000:
+            QC.clear()
+        for k, v in res["data"].items():
+            QC[k] = (now, v); out[k] = v
+    times = [v["sources"][0]["time"] for v in out.values() if v.get("sources")]
+    return {"data": out, "updated": max(times) if times else now_tw(),
+            "source_policy": "Yahoo Finance 為主要來源；第二來源僅作交叉檢查"}
+
 @app.get("/quote")
 def quote():
-    keys = sorted({k for k in request.args.get("keys", "").split(",") if KEY.match(k)})[:30]
+    keys = sorted({k for k in request.args.get("keys", "").split(",") if KEY.match(k)})[:60]
     if not keys:
         return jsonify(error="no keys"), 400
     cmp = {k for k in request.args.get("cmp", "").split(",") if KEY.match(k)}
-    resp = jsonify(cached("q" + ",".join(keys) + "|" + ",".join(sorted(cmp)), 15, lambda: live(keys, cmp)))
+    resp = jsonify(live_cached(keys, cmp))
     resp.headers["Cache-Control"] = "public, max-age=10"
     return resp
 
