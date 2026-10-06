@@ -1,8 +1,8 @@
 """Cloud Run 轉接服務：/quote?keys=TW2330,USNVDA（盤中報價）、/stock?key=TW2330&name=台積電（K線+股利+公司資訊+新聞）"""
-import os, re, time, datetime as dt, urllib.parse, urllib.request, xml.etree.ElementTree as ET, difflib, email.utils
+import json, os, re, time, datetime as dt, urllib.parse, urllib.request, xml.etree.ElementTree as ET, difflib, email.utils
 import pandas as pd, yfinance as yf
 from flask import Flask, jsonify, request
-from fetch_data import download, gnews, r, vol
+from fetch_data import download, extra_symbols, gnews, r, vol
 
 app = Flask(__name__)
 ALLOW = os.environ.get("ALLOW_ORIGIN", "*")   # 例如 https://帳號.github.io
@@ -180,11 +180,11 @@ def mkt_open(m):
     except Exception:
         return True
 
-def live_cached(keys, cmp=()):
+def live_cached(keys, cmp=(), maxage=None):
     now, out, need = time.time(), {}, []
     for k in keys:
         h = QC.get(k)
-        if h and k not in cmp and now - h[0] < (15 if mkt_open(k[:2]) else 600):
+        if h and k not in cmp and now - h[0] < (maxage if maxage is not None else 15 if mkt_open(k[:2]) else 600):
             out[k] = h[1]
         else:
             need.append(k)
@@ -198,13 +198,41 @@ def live_cached(keys, cmp=()):
     return {"data": out, "updated": max(times) if times else now_tw(),
             "source_policy": "Yahoo Finance 為主要來源；第二來源僅作交叉檢查"}
 
+LISTS = {"t": 0, "keys": {}}
+
+def prefetch_keys(m):
+    """預抓名單 = 精選名單（history.json 的鍵）+ 各分類成交金額前幾名（universe.json）。資料來自 GitHub 的 data 分支。"""
+    if time.time() - LISTS["t"] > 1800:
+        base = os.environ["DATA_BASE"].rstrip("/")
+        get = lambda f: json.load(urllib.request.urlopen(urllib.request.Request(f"{base}/{f}", headers={"User-Agent": "stock-proxy"}), timeout=30))["data"]
+        u, h = get("universe.json"), get("history.json")
+        LISTS["keys"] = {mm: {k for k in h if k.startswith(mm)} for mm in ("TW", "US")}
+        for mm, c, _ in extra_symbols(u):
+            LISTS["keys"][mm].add(mm + c)
+        LISTS["t"] = time.time()
+    return sorted(LISTS["keys"][m])
+
+@app.route("/prefetch", methods=["GET", "POST"])
+def prefetch():
+    """給 Cloud Scheduler 定時呼叫：開盤中把常見股票的報價先抓進快取，並順便保持實例暖機"""
+    if request.headers.get("X-Prefetch-Token", "") != os.environ.get("PREFETCH_TOKEN", "\0"):
+        return "forbidden", 403
+    m = request.args.get("m", "")
+    if m not in ("TW", "US") or not mkt_open(m):
+        return jsonify(skipped=True, reason="休市或參數錯誤")
+    keys = prefetch_keys(m)
+    for i in range(0, len(keys), 60):
+        live_cached(keys[i:i + 60], maxage=0)
+    return jsonify(market=m, count=len(keys), at=now_tw())
+
 @app.get("/quote")
 def quote():
     keys = sorted({k for k in request.args.get("keys", "").split(",") if KEY.match(k)})[:60]
     if not keys:
         return jsonify(error="no keys"), 400
     cmp = {k for k in request.args.get("cmp", "").split(",") if KEY.match(k)}
-    resp = jsonify(live_cached(keys, cmp))
+    maxage = request.args.get("maxage", type=int)
+    resp = jsonify(live_cached(keys, cmp, None if maxage is None else max(0, min(maxage, 600))))
     resp.headers["Cache-Control"] = "public, max-age=10"
     return resp
 
