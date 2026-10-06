@@ -93,15 +93,20 @@ def save_history(res):
                      for i, x in d.iterrows()]
     write("history.json", data)
 
-def extra_symbols():
+TW_TOP, US_TOP = int(os.environ.get("TW_TOP", 12)), int(os.environ.get("US_TOP", 4))  # 每個分類預抓的檔數
+
+def extra_symbols(u=None):
     """從 universe.json 挑出各分類畫面最常出現的股票（成交金額前幾名），盤中一併抓報價"""
-    try:
-        u = json.load(open(f"{OUT}/universe.json", encoding="utf-8"))["data"]
-    except Exception:
-        return []
-    have = {(m, c) for m, c, _ in symbols()}
+    if u is None:
+        try:
+            u = json.load(open(f"{OUT}/universe.json", encoding="utf-8"))["data"]
+        except Exception:
+            return []
+        have = {(m, c) for m, c, _ in symbols()}
+    else:  # 在 Cloud Run 上呼叫：名單由呼叫端提供，沒有 stock.html
+        have = set()
     out = []
-    for m, n_top in (("TW", 8), ("US", 2)):  # 台股每個產業前 8、美股每個 GICS 子產業前 2
+    for m, n_top in (("TW", TW_TOP), ("US", US_TOP)):  # 台股每個產業前 N、美股每個 GICS 子產業前 N
         groups = {}
         for x in u.get(m, []):
             if m == "TW" and x[2] == "R":  # 興櫃 Yahoo 沒有資料
