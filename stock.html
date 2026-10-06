@@ -243,7 +243,7 @@ async function proxyQuotes(force){let ks=[...new Set([...(cur?[cur[0]]:[]),...VI
  if(!ks.length){if(!force)stamp(LAST.src,LAST.t);return true}
  try{const q=await pget('/quote?keys='+ks.join(',')+(cur?'&cmp='+cur[0]:''));ks.forEach(k=>FETCHED.add(k));stamp('即時報價（Cloud Run／Yahoo）',q.updated);
   for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;
-   if(s.snap){const l=s.k[1];l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v;s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison||null};continue}
+   if(s.snap){const l=s.k[1];if(x.pc){const b=s.k[0];b.o=b.h=b.l=b.c=x.pc}l.o=x.o;l.c=x.p;l.h=x.h;l.l=x.l;l.v=x.v;s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison||null};continue}
    if(x.comparison)s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison};
    const l=s.k[s.k.length-1];if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('proxy quote',e);stamp('⚠️ 即時報價連線失敗，改用排程資料',null,1);return false}return true}
 ind='🔥 全市場熱門';render();Promise.allSettled([loadHistory(),loadUniverse()]).then(()=>{LOADED=true});
