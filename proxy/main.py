@@ -145,9 +145,9 @@ def yahoo_live(keys):
     for k in keys:
         d = got.get(ys[k])
         if d is None: continue
-        x = d.iloc[-1]; date = d.index[-1].strftime("%Y-%m-%d")
+        x = d.iloc[-1]; date = d.index[-1].strftime("%Y-%m-%d"); pc = r(d.iloc[-2].Close) if len(d) > 1 else None
         data[k] = {"t": d.index[-1].strftime("%m-%d"), "o": r(x.Open), "h": r(x.High),
-                   "l": r(x.Low), "p": r(x.Close), "v": vol(k[:2], x.Volume), "date": date}
+                   "l": r(x.Low), "p": r(x.Close), "v": vol(k[:2], x.Volume), "date": date, "pc": pc}
     return data
 
 def live(keys, cmp=()):
