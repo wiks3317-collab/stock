@@ -3,6 +3,7 @@ on:
   schedule:
     - cron: "*/5 1-5 * * 1-5"    # 台股盤中（UTC 1-5 = 台北 9-13）→ 即時價量
     - cron: "*/5 13-22 * * 1-5"  # 覆蓋美股夏/冬令時間 → 即時價量
+    - cron: "30 7 * * 1-5"        # 台股收盤後較早更新全市場名單與當日行情（台北 15:30）
     - cron: "30 10 * * 1-5"       # 台股收盤後 → K 線 + 股利 + 新聞
     - cron: "30 22 * * 1-5"       # 美股收盤後 → K 線 + 股利 + 新聞
   workflow_dispatch:
@@ -34,6 +35,7 @@ jobs:
         run: |
           S="${{ github.event.schedule }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then M="${{ inputs.mode }}"
+          elif [ "$S" = "30 7 * * 1-5" ]; then M=universe
           elif [ "$S" = "30 10 * * 1-5" ] || [ "$S" = "30 22 * * 1-5" ]; then M=daily
           else M=live; fi
           echo "MODE=$M" >> "$GITHUB_ENV"
