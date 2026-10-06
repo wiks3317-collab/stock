@@ -182,12 +182,7 @@ async function loadHistory(){try{const h=await getJSON('history.json');let n=0;
  real=n>0;recalc();render();
  $('note').innerHTML='資料來源：Yahoo Finance，由 GitHub Actions 定時抓取（可能有延遲）。K 線更新：'+h.updated+'。';loadExtras()}
  catch(e){console.warn('無法載入 history.json，維持示範資料',e)}}
-async function loadQuotes(){try{const q=await getJSON('live.json');stamp('排程資料（GitHub Actions）',q.updated);
- for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;
-  s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison||null};
-  let l=s.k[s.k.length-1];
-  if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}
-  else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('live.json 載入失敗',e)}}
+async function loadQuotes(){try{const q=await getJSON('live.json');stamp('排程資料（GitHub Actions）',q.updated);applyQ(q);Object.keys(q.data).forEach(k=>GOT.add(k))}catch(e){console.warn('live.json 載入失敗',e)}}
 function demoTick(){all().forEach(s=>{const l=s.k[s.k.length-1];if(Math.random()<.5){l.c*=1+(Math.random()-.5)*.004;l.h=Math.max(l.h,l.c);l.l=Math.min(l.l,l.c);l.v*=1+Math.random()*.003}})}
 setInterval(async()=>{if(!liveOn)return;tk++;
  if(PROXY_URL){if(document.hidden||!LOADED)return;const ph=phase('TW')+phase('US');if(ph!==PH){if(PH)FETCHED.clear();PH=ph}const per=tk%(VIS.length<=30?5:VIS.length<=60?10:20)==0,need=VIS.some(k=>!FETCHED.has(k));if(!per&&!need)return;if(await proxyQuotes(!per)===false&&real&&tk%20==0)await loadQuotes()}else if(real){if(tk%20)return;await loadQuotes()}else demoTick();
@@ -215,7 +210,7 @@ function rebuildDynamicTree(){
  // RAW 只作為 universe 尚未載入時的初始畫面，不再主導正式分類資料。
  TREE.TW=next.TW;TREE.US=next.US;
 }
-async function loadUniverse(){try{const u=await getJSON('universe.json');
+async function loadUniverse(){try{const u=await getJSON('universe.json');UT=u.updated||'';
  const add=(m,x,mother,sub)=>{const key=m+x[0],c=x[7];if(S[key]||!c)return;const s={m,code:x[0],name:x[1],i:mother,sub,snap:1,r:hs(x[0]),k:[{t:'',o:c-x[8],h:c-x[8],l:c-x[8],c:c-x[8],v:0},{t:'',o:x[4],h:x[5],l:x[6],c,v:x[9]}]};
   S[key]=s};
  (u.data.TW||[]).forEach(x=>add('TW',x,x[3]=='ETF'?'ETF':x[3]=='興櫃'?'興櫃':MAP[x[3]]||'傳產',x[3]=='興櫃'?'興櫃':x[3]));
@@ -243,8 +238,8 @@ async function loadStock(s){snapDetail(s);const key=s.m+s.code;
   s._sourceMeta={quote:d.sources&&d.sources.quote?d.sources.quote.name:'Yahoo Finance',fetched:d.fetched_at||'',compare:null};
   ind_(s);detail(key)}
  catch(e){$('md').insertAdjacentHTML('beforeend','<p style="color:var(--mu)">轉接服務載入失敗，請稍後再試。</p>')}}
-let BUSY=false,FAILT=0;
-function applyQ(q){for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;
+let BUSY=false,FAILT=0,UT='';
+function applyQ(q){for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;if(s.snap&&UT&&x.ft&&x.ft.slice(0,16)<UT)continue;
    if(s.snap){const l=s.k[1];if(x.pc){const b=s.k[0];b.o=b.h=b.l=b.c=x.pc}l.o=x.o;l.c=x.p;l.h=x.h;l.l=x.l;l.v=x.v;s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison||null};continue}
    if(x.comparison)s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison};
    const l=s.k[s.k.length-1];if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}
@@ -259,5 +254,5 @@ async function proxyQuotes(force){if(BUSY)return true;let ks=[...new Set([...(cu
  catch(e){console.warn('proxy quote',e);FAILT=Date.now();stamp('⚠️ 即時報價連線失敗，改用排程資料',null,1);return false}
  finally{BUSY=false}
  return true}
-ind='🔥 全市場熱門';render();Promise.allSettled([loadHistory(),loadUniverse()]).then(()=>{LOADED=true;if(PROXY_URL)proxyQuotes(true).then(()=>{recalc();render()})});
+ind='🔥 全市場熱門';render();Promise.allSettled([loadHistory(),loadUniverse()]).then(async()=>{LOADED=true;await loadQuotes();recalc();render();if(PROXY_URL)proxyQuotes(true).then(()=>{recalc();render()})});
 </script></body></html>
