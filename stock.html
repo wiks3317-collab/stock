@@ -249,7 +249,7 @@ async function proxyQuotes(force){if(BUSY)return true;let ks=[...new Set([...(cu
  if(Date.now()-FAILT<30000)return false;
  BUSY=true;if(force&&$('stamp'))$('stamp').textContent='⏳ 更新報價中…';
  try{const ch=[];for(let i=0;i<ks.length;i+=60)ch.push(ks.slice(i,i+60));
-  const rs=await Promise.all(ch.map(c=>pget('/quote?keys='+c.join(',')+(cur&&c.includes(cur[0])?'&cmp='+cur[0]:''))));
+  const rs=await Promise.all(ch.map(c=>pget('/quote?keys='+c.join(',')+(force?'&maxage=330':'')+(cur&&c.includes(cur[0])?'&cmp='+cur[0]:''))));
   ks.forEach(k=>{FETCHED.add(k);GOT.add(k)});rs.forEach(q=>{stamp('即時報價（Cloud Run／Yahoo）',q.updated);applyQ(q)})}
  catch(e){console.warn('proxy quote',e);FAILT=Date.now();stamp('⚠️ 即時報價連線失敗，改用排程資料',null,1);return false}
  finally{BUSY=false}
