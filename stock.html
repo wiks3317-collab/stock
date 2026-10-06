@@ -190,7 +190,7 @@ async function loadQuotes(){try{const q=await getJSON('live.json');stamp('排程
   else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('live.json 載入失敗',e)}}
 function demoTick(){all().forEach(s=>{const l=s.k[s.k.length-1];if(Math.random()<.5){l.c*=1+(Math.random()-.5)*.004;l.h=Math.max(l.h,l.c);l.l=Math.min(l.l,l.c);l.v*=1+Math.random()*.003}})}
 setInterval(async()=>{if(!liveOn)return;tk++;
- if(PROXY_URL){if(document.hidden||!LOADED)return;const ph=phase('TW')+phase('US');if(ph!==PH){if(PH)FETCHED.clear();PH=ph}const per=tk%5==0,need=VIS.some(k=>!FETCHED.has(k));if(!per&&!need)return;if(await proxyQuotes(!per)===false&&real&&tk%20==0)await loadQuotes()}else if(real){if(tk%20)return;await loadQuotes()}else demoTick();
+ if(PROXY_URL){if(document.hidden||!LOADED)return;const ph=phase('TW')+phase('US');if(ph!==PH){if(PH)FETCHED.clear();PH=ph}const per=tk%(VIS.length<=30?5:VIS.length<=60?10:20)==0,need=VIS.some(k=>!FETCHED.has(k));if(!per&&!need)return;if(await proxyQuotes(!per)===false&&real&&tk%20==0)await loadQuotes()}else if(real){if(tk%20)return;await loadQuotes()}else demoTick();
  recalc();if($('ov').style.display!='block')render();else if((real||PROXY_URL)&&cur&&cur[2]==0)detail(cur[0],cur[1],0)},3000);
 const MAP={'半導體業':'電子','電腦及週邊':'電子','光電業':'電子','通信網路':'電子','電子零組件':'電子','電子通路':'電子','資訊服務':'電子','其他電子':'電子','數位雲端':'電子','生技醫療':'生技醫療','航運業':'運輸','觀光餐旅':'百貨零售','貿易百貨':'百貨零售','居家生活':'百貨零售','電子商務':'百貨零售','運動休閒':'百貨零售','金融保險':'金融','建材營造':'營建','綠能環保':'綠能環保','ETF':'ETF','興櫃':'興櫃'};
 const USMAP={'Information Technology':'科技','Health Care':'生技醫療','Financials':'金融','Industrials':'工業運輸','Consumer Discretionary':'零售百貨','Consumer Staples':'零售百貨','Energy':'能源','Utilities':'公用事業','Materials':'原物料','Real Estate':'不動產','Communication Services':'通訊媒體','ETF':'ETF'};
@@ -243,14 +243,21 @@ async function loadStock(s){snapDetail(s);const key=s.m+s.code;
   s._sourceMeta={quote:d.sources&&d.sources.quote?d.sources.quote.name:'Yahoo Finance',fetched:d.fetched_at||'',compare:null};
   ind_(s);detail(key)}
  catch(e){$('md').insertAdjacentHTML('beforeend','<p style="color:var(--mu)">轉接服務載入失敗，請稍後再試。</p>')}}
-async function proxyQuotes(force){let ks=[...new Set([...(cur?[cur[0]]:[]),...VIS])];
- ks=(force?ks.filter(k=>!FETCHED.has(k)):ks.filter(k=>isOpen(k.slice(0,2)))).slice(0,30);
- if(!ks.length){if(!force)stamp(LAST.src,LAST.t);return true}
- if(force&&$('stamp'))$('stamp').textContent='⏳ 更新報價中…';
- try{const q=await pget('/quote?keys='+ks.join(',')+(cur?'&cmp='+cur[0]:''));ks.forEach(k=>{FETCHED.add(k);GOT.add(k)});stamp('即時報價（Cloud Run／Yahoo）',q.updated);
-  for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;
+let BUSY=false,FAILT=0;
+function applyQ(q){for(const key in q.data){const s=S[key],x=q.data[key];if(!s)continue;
    if(s.snap){const l=s.k[1];if(x.pc){const b=s.k[0];b.o=b.h=b.l=b.c=x.pc}l.o=x.o;l.c=x.p;l.h=x.h;l.l=x.l;l.v=x.v;s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison||null};continue}
    if(x.comparison)s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison};
-   const l=s.k[s.k.length-1];if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}catch(e){console.warn('proxy quote',e);stamp('⚠️ 即時報價連線失敗，改用排程資料',null,1);return false}return true}
+   const l=s.k[s.k.length-1];if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}
+async function proxyQuotes(force){if(BUSY)return true;let ks=[...new Set([...(cur?[cur[0]]:[]),...VIS])];
+ ks=(force?ks.filter(k=>!FETCHED.has(k)):ks.filter(k=>isOpen(k.slice(0,2)))).slice(0,120);
+ if(!ks.length){if(!force)stamp(LAST.src,LAST.t);return true}
+ if(Date.now()-FAILT<30000)return false;
+ BUSY=true;if(force&&$('stamp'))$('stamp').textContent='⏳ 更新報價中…';
+ try{const ch=[];for(let i=0;i<ks.length;i+=60)ch.push(ks.slice(i,i+60));
+  const rs=await Promise.all(ch.map(c=>pget('/quote?keys='+c.join(',')+(cur&&c.includes(cur[0])?'&cmp='+cur[0]:''))));
+  ks.forEach(k=>{FETCHED.add(k);GOT.add(k)});rs.forEach(q=>{stamp('即時報價（Cloud Run／Yahoo）',q.updated);applyQ(q)})}
+ catch(e){console.warn('proxy quote',e);FAILT=Date.now();stamp('⚠️ 即時報價連線失敗，改用排程資料',null,1);return false}
+ finally{BUSY=false}
+ return true}
 ind='🔥 全市場熱門';render();Promise.allSettled([loadHistory(),loadUniverse()]).then(()=>{LOADED=true;if(PROXY_URL)proxyQuotes(true).then(()=>{recalc();render()})});
 </script></body></html>
