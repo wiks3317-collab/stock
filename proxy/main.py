@@ -1,5 +1,5 @@
 """Cloud Run 轉接服務：/quote?keys=TW2330,USNVDA（盤中報價）、/stock?key=TW2330&name=台積電（K線+股利+公司資訊+新聞）"""
-import json, os, re, time, datetime as dt, urllib.parse, urllib.request, xml.etree.ElementTree as ET, difflib, email.utils
+import json, os, re, threading, time, datetime as dt, urllib.parse, urllib.request, xml.etree.ElementTree as ET, difflib, email.utils
 import pandas as pd, yfinance as yf
 from flask import Flask, jsonify, request
 from fetch_data import download, extra_symbols, gnews, r, vol
@@ -212,18 +212,42 @@ def prefetch_keys(m):
         LISTS["t"] = time.time()
     return sorted(LISTS["keys"][m])
 
+PF = {"lock": threading.Lock(), "running": {}, "last": {}}   # 背景預抓狀態：執行中 / 上一輪結果
+
+def run_prefetch(m):
+    """實際的預抓工作（可能要跑超過 30 秒，所以放背景執行）"""
+    t0 = time.time()
+    try:
+        keys = prefetch_keys(m)
+        for i in range(0, len(keys), 60):
+            live_cached(keys[i:i + 60], maxage=0)
+        PF["last"][m] = {"ok": True, "count": len(keys), "seconds": round(time.time() - t0, 1), "at": now_tw()}
+    except Exception as e:
+        PF["last"][m] = {"ok": False, "error": str(e)[:200], "seconds": round(time.time() - t0, 1), "at": now_tw()}
+        print("prefetch error", m, repr(e), flush=True)
+    finally:
+        with PF["lock"]:
+            PF["running"].pop(m, None)
+    return PF["last"][m]
+
 @app.route("/prefetch", methods=["GET", "POST"])
 def prefetch():
-    """給 Cloud Scheduler 定時呼叫：開盤中把常見股票的報價先抓進快取，並順便保持實例暖機"""
+    """給外部排程（cron-job.org 等）定時呼叫：開盤中把常見股票的報價先抓進快取。
+    立刻回應、實際工作在背景執行，避免排程服務的 30 秒逾時；加 &wait=1 可改成等跑完再回應（手動測試用）。
+    背景執行需要 Cloud Run 開啟「CPU 一律分配」（--no-cpu-throttling）。"""
     if request.headers.get("X-Prefetch-Token", "") != os.environ.get("PREFETCH_TOKEN", "\0"):
         return "forbidden", 403
     m = request.args.get("m", "")
     if m not in ("TW", "US") or not mkt_open(m):
         return jsonify(skipped=True, reason="休市或參數錯誤")
-    keys = prefetch_keys(m)
-    for i in range(0, len(keys), 60):
-        live_cached(keys[i:i + 60], maxage=0)
-    return jsonify(market=m, count=len(keys), at=now_tw())
+    with PF["lock"]:
+        if m in PF["running"]:
+            return jsonify(started=False, reason="上一輪還在執行", running_since=PF["running"][m], last=PF["last"].get(m))
+        PF["running"][m] = now_tw()
+    if request.args.get("wait") == "1":
+        return jsonify(market=m, **run_prefetch(m))
+    threading.Thread(target=run_prefetch, args=(m,), daemon=True).start()
+    return jsonify(started=True, market=m, at=now_tw(), last=PF["last"].get(m))
 
 @app.get("/quote")
 def quote():
