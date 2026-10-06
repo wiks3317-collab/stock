@@ -29,7 +29,7 @@ def symbols():
             seen.add((m, c)); res.append((m, c, n))
     return res
 
-def download(tickers, period):
+def _download(tickers, period):
     df = yf.download(tickers, period=period, interval="1d", group_by="ticker",
                      auto_adjust=False, threads=True, progress=False)
     res = {}
@@ -42,8 +42,14 @@ def download(tickers, period):
             res[t] = d
     return res
 
-def fetch(period):
-    syms = symbols()
+def download(tickers, period):  # 一次最多 100 檔，避免一次要太多被 Yahoo 擋
+    res = {}
+    for i in range(0, len(tickers), 100):
+        res.update(_download(tickers[i:i + 100], period))
+    return res
+
+def fetch(period, extra=()):
+    syms = list({(m, c): (m, c, n) for m, c, n in symbols() + list(extra)}.values())
     ysym = {(m, c): (c + ".TW" if m == "TW" else c) for m, c, _ in syms}
     got = download(list(ysym.values()), period)
     miss = [(m, c) for (m, c), y in ysym.items() if m == "TW" and y not in got]
@@ -87,12 +93,36 @@ def save_history(res):
                      for i, x in d.iterrows()]
     write("history.json", data)
 
+def extra_symbols():
+    """從 universe.json 挑出各分類畫面最常出現的股票（成交金額前幾名），盤中一併抓報價"""
+    try:
+        u = json.load(open(f"{OUT}/universe.json", encoding="utf-8"))["data"]
+    except Exception:
+        return []
+    have = {(m, c) for m, c, _ in symbols()}
+    out = []
+    for m, n_top in (("TW", 8), ("US", 2)):  # 台股每個產業前 8、美股每個 GICS 子產業前 2
+        groups = {}
+        for x in u.get(m, []):
+            if m == "TW" and x[2] == "R":  # 興櫃 Yahoo 沒有資料
+                continue
+            groups.setdefault(x[3], []).append(x)
+        for rows in groups.values():
+            rows.sort(key=lambda x: x[7] * x[9], reverse=True)  # 成交金額
+            out += [(m, x[0], x[1]) for x in rows[:n_top] if (m, x[0]) not in have]
+    return out
+
 def live():
+    mk = "TW" if dt.datetime.now(dt.timezone.utc).hour < 8 else "US"  # 台股時段抓台股、美股時段抓美股
+    extra = [e for e in extra_symbols() if e[0] == mk]
+    print(f"精選名單 + 額外 {len(extra)} 檔（{mk}）")
+    ft = dt.datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
     data = {}
-    for key, v in fetch("5d").items():
+    for key, v in fetch("5d", extra).items():
         d = v["df"]; x = d.iloc[-1]
         data[key] = {"t": d.index[-1].strftime("%m-%d"), "o": r(x.Open), "h": r(x.High),
-                     "l": r(x.Low), "p": r(x.Close), "v": vol(v["m"], x.Volume)}
+                     "l": r(x.Low), "p": r(x.Close), "v": vol(v["m"], x.Volume),
+                     "pc": r(d.iloc[-2].Close) if len(d) > 1 else None, "ft": ft}
     write("live.json", data, merge=False)
 
 def details(res):
