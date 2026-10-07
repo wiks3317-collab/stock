@@ -182,7 +182,7 @@ async function loadHistory(){try{const h=await getJSON('history.json');let n=0;
  real=n>0;recalc();render();
  $('note').innerHTML='資料來源：Yahoo Finance，由 GitHub Actions 定時抓取（可能有延遲）。K 線更新：'+h.updated+'。';loadExtras()}
  catch(e){console.warn('無法載入 history.json，維持示範資料',e)}}
-async function loadQuotes(){try{const q=await getJSON('live.json');stamp('排程資料（GitHub Actions）',q.updated);applyQ(q);Object.keys(q.data).forEach(k=>GOT.add(k))}catch(e){console.warn('live.json 載入失敗',e)}}
+async function loadQuotes(){try{const q=await getJSON('live.json');stamp('排程資料（GitHub Actions）',q.updated);applyQ(q);for(const k in q.data){GOT.add(k);const t=tsOf(q.data[k].ft);if(t)ST[k]=t}}catch(e){console.warn('live.json 載入失敗',e)}}
 function demoTick(){all().forEach(s=>{const l=s.k[s.k.length-1];if(Math.random()<.5){l.c*=1+(Math.random()-.5)*.004;l.h=Math.max(l.h,l.c);l.l=Math.min(l.l,l.c);l.v*=1+Math.random()*.003}})}
 setInterval(async()=>{if(!liveOn)return;tk++;
  if(PROXY_URL){if(document.hidden||!LOADED)return;const ph=phase('TW')+phase('US');if(ph!==PH){if(PH)FETCHED.clear();PH=ph}const per=tk%(VIS.length<=30?5:VIS.length<=60?10:20)==0,need=VIS.some(k=>!FETCHED.has(k));if(!per&&!need)return;if(await proxyQuotes(!per)===false&&real&&tk%20==0)await loadQuotes()}else if(real){if(tk%20)return;await loadQuotes()}else demoTick();
@@ -229,6 +229,20 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)tk=Math.ce
 // 交易階段：台股 08:55 / 13:35 / 15:35、美股 09:25 / 16:05 為分界；階段或日期改變時，重新抓一次畫面上的報價
 function phase(m,d=new Date()){const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:m=='TW'?'Asia/Taipei':'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));
  const t=(+p.hour%24)*60+ +p.minute,b=m=='TW'?[535,815,935]:[565,965,1e9];return m+p.year+p.month+p.day+(t<b[0]?0:t<b[1]?1:t<b[2]?2:3)}
+// ── 快照新鮮度：判斷「GitHub 排程資料」夠不夠新，夠新就不必再打 Cloud Run ──
+const ST={}; // 代號 → 該檔 live.json 報價的抓取時間（毫秒）
+const zp=(tz,d)=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',weekday:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));
+const tsOf=s=>{if(!s)return 0;const t=Date.parse(s.replace(' ','T')+(s.length<=16?':00':'')+'+08:00');return isNaN(t)?0:t}; // 資料裡的時間都是台北時間
+// 最近一次已經過去的收盤時間（毫秒；台股 13:30、美股 16:00 當地時間，略過週末）
+function lastClose(m,now=Date.now()){const tz=m=='TW'?'Asia/Taipei':'America/New_York',cm=m=='TW'?810:960;
+ for(let i=0;i<9;i++){const p=zp(tz,new Date(now-i*864e5));if(p.weekday=='Sat'||p.weekday=='Sun')continue;
+  const w=Date.UTC(+p.year,+p.month-1,+p.day,Math.floor(cm/60),cm%60),q=zp(tz,new Date(w)),o=Date.UTC(+q.year,+q.month-1,+q.day,+q.hour%24,+q.minute,+q.second)-w,t=w-o;
+  if(t<=now)return t}
+ return 0}
+// 這檔目前畫面上的價格來自哪個時間：live.json 的報價，或全市場名單（universe.json）的更新時間，取較新者
+function snapT(k){const s=S[k],a=ST[k]||0;return s&&s.snap&&UT?Math.max(a,tsOf(UT)):a}
+// 開盤中：報價在 5 分鐘內就算新；休市：報價是收盤（含 5 分鐘緩衝）之後抓的，就是最終價，不必再抓
+function isFresh(k){const m=k.slice(0,2),t=snapT(k);if(!t)return false;return isOpen(m)?Date.now()-t<3e5:t>=lastClose(m)+3e5}
 function stamp(src,t,warn){const e=$('stamp');if(!e)return;if(!warn){LAST={src,t}}const n=new Date(),p=x=>String(x).padStart(2,'0');e.style.color=warn?'#e5484d':'';e.textContent=(warn?'':'🕒 ')+src+'・最新抓取 '+(t||'—')+'・'+['TW','US'].map(m=>(m=='TW'?'台股':'美股')+(isOpen(m)?'開盤中':'休市')).join('、')+'・畫面刷新 '+p(n.getHours())+':'+p(n.getMinutes())+':'+p(n.getSeconds())}
 async function pget(p){const r=await fetch(PROXY_URL+p);if(!r.ok)throw new Error(r.status);return r.json()}
 async function loadStock(s){snapDetail(s);const key=s.m+s.code;
@@ -244,13 +258,19 @@ function applyQ(q){for(const key in q.data){const s=S[key],x=q.data[key];if(!s)c
    if(x.comparison)s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison};
    const l=s.k[s.k.length-1];if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}
 async function proxyQuotes(force){if(BUSY)return true;let ks=[...new Set([...(cur?[cur[0]]:[]),...VIS])];
- ks=(force?ks.filter(k=>!FETCHED.has(k)):ks.filter(k=>isOpen(k.slice(0,2)))).slice(0,120);
+ ks=(force?ks.filter(k=>{if(FETCHED.has(k))return false;if(isFresh(k)){FETCHED.add(k);GOT.add(k);return false}return true}):ks.filter(k=>isOpen(k.slice(0,2)))).slice(0,120);
  if(!ks.length){if(!force)stamp(LAST.src,LAST.t);return true}
  if(Date.now()-FAILT<30000)return false;
  BUSY=true;if(force&&$('stamp'))$('stamp').textContent='⏳ 更新報價中…';
- try{const ch=[];for(let i=0;i<ks.length;i+=60)ch.push(ks.slice(i,i+60));
-  const rs=await Promise.all(ch.map(c=>pget('/quote?keys='+c.join(',')+(force?'&maxage=330':'')+(cur&&c.includes(cur[0])?'&cmp='+cur[0]:''))));
-  ks.forEach(k=>{FETCHED.add(k);GOT.add(k)});rs.forEach(q=>{stamp('即時報價（Cloud Run／Yahoo）',q.updated);applyQ(q)})}
+ try{const ch=[];for(let i=0;i<ks.length;i+=40)ch.push(ks.slice(i,i+40));
+  let ok=0,bad=0;
+  await Promise.allSettled(ch.map(async c=>{
+   try{const q=await pget('/quote?keys='+c.join(',')+(force?'&maxage=330':'')+(cur&&c.includes(cur[0])?'&cmp='+cur[0]:''));
+    c.forEach(k=>{FETCHED.add(k);GOT.add(k)});stamp('即時報價（Cloud Run／Yahoo）',q.updated);applyQ(q);ok++;
+    if($('ov').style.display!='block'){recalc();render()} // 一批回來就先顯示，不必等全部
+   }catch(e){bad++;console.warn('proxy quote chunk',e)}}));
+  if(bad)FAILT=Date.now(); // 有失敗的批次：30 秒後再試，已成功的批次照常使用
+  if(!ok){stamp('⚠️ 即時報價連線失敗，改用排程資料',null,1);return false}}
  catch(e){console.warn('proxy quote',e);FAILT=Date.now();stamp('⚠️ 即時報價連線失敗，改用排程資料',null,1);return false}
  finally{BUSY=false}
  return true}
