@@ -42,6 +42,8 @@ jobs:
       - run: python fetch_data.py "$MODE"
         env:
           OUT_DIR: pub
+          TW_TOP: "20"   # live.json 涵蓋的額外名單：台股每個產業前 20 檔（畫面每區只顯示前 10，多留餘裕）
+          US_TOP: "10"   # 美股每個 GICS 子產業前 10 檔（等於幾乎涵蓋 S&P500 + Nasdaq100）
       - name: 發佈到 data 分支（每次覆蓋，只保留 1 個 commit）
         run: |
           cd pub
