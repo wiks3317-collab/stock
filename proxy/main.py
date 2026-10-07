@@ -1,5 +1,5 @@
 """Cloud Run 轉接服務：/quote?keys=TW2330,USNVDA（盤中報價）、/stock?key=TW2330&name=台積電（K線+股利+公司資訊+新聞）"""
-import json, os, re, time, datetime as dt, urllib.parse, urllib.request, xml.etree.ElementTree as ET, difflib, email.utils
+import json, os, re, threading, time, datetime as dt, urllib.parse, urllib.request, xml.etree.ElementTree as ET, difflib, email.utils
 import pandas as pd, yfinance as yf
 from flask import Flask, jsonify, request
 from fetch_data import download, extra_symbols, gnews, r, vol
@@ -212,28 +212,60 @@ def prefetch_keys(m):
         LISTS["t"] = time.time()
     return sorted(LISTS["keys"][m])
 
+PF_LOCK = {"TW": threading.Lock(), "US": threading.Lock()}  # 同一市場同時只跑一個預抓，避免排程重疊互相搶資源
+
 @app.route("/prefetch", methods=["GET", "POST"])
 def prefetch():
     """給外部排程（cron-job.org 等）定時呼叫：開盤中把常見股票的報價先抓進快取。
-    名單可切成 parts 份，每次只抓第 part 份（0 起算），讓單次請求在排程服務的逾時（30 秒）內完成：
-      /prefetch?m=TW                  → 抓全部（舊行為，Cloud Scheduler 用）
-      /prefetch?m=TW&part=0&parts=3   → 只抓三份中的第 1 份
-    不使用背景執行緒，所以 Cloud Run 不需要開「CPU 一律分配」，維持免費額度內的請求計費。"""
+    預設是「限時滾動」模式：每次呼叫只抓最久沒更新的那幾批，超過時間預算（budget 秒）就不再開新的一批並立刻回應，
+    所以單次請求一定在排程服務的 30 秒逾時內結束；名單很長也沒關係，排程每分鐘呼叫一次，會一批接一批輪流更新。
+      /prefetch?m=TW                    → 預設：預算 15 秒、每批 20 檔、5 分鐘內抓過的先跳過
+      /prefetch?m=TW&budget=12&batch=15 → 自訂（budget 5~25 秒、batch 5~60 檔、fresh 為「幾秒內抓過就跳過」）
+      /prefetch?m=TW&part=0&parts=3     → 舊的固定分份模式（一次抓完該份，不限時）
+    不使用背景執行緒，所以 Cloud Run 不需要開「CPU 一律分配」，維持請求計費。"""
     if request.headers.get("X-Prefetch-Token", "") != os.environ.get("PREFETCH_TOKEN", "\0"):
         return "forbidden", 403
     m = request.args.get("m", "")
     if m not in ("TW", "US") or not mkt_open(m):
         return jsonify(skipped=True, reason="休市或參數錯誤")
-    parts = max(1, min(request.args.get("parts", 1, type=int), 50))
-    part = request.args.get("part", 0, type=int)
-    if not 0 <= part < parts:
-        return jsonify(error="part 必須介於 0 到 parts-1"), 400
     t0 = time.time()
-    keys = prefetch_keys(m)[part::parts]   # 間隔取樣，各份數量平均
-    for i in range(0, len(keys), 60):
-        live_cached(keys[i:i + 60], maxage=0)
-    return jsonify(market=m, part=part, parts=parts, count=len(keys),
+    try:
+        keys = prefetch_keys(m)
+    except Exception as e:
+        return jsonify(error="名單載入失敗：" + str(e)[:150]), 502
+    if "parts" in request.args:  # 舊模式
+        parts = max(1, min(request.args.get("parts", 1, type=int), 50))
+        part = request.args.get("part", 0, type=int)
+        if not 0 <= part < parts:
+            return jsonify(error="part 必須介於 0 到 parts-1"), 400
+        keys = keys[part::parts]
+        for i in range(0, len(keys), 60):
+            live_cached(keys[i:i + 60], maxage=0)
+        return jsonify(market=m, part=part, parts=parts, count=len(keys), seconds=round(time.time() - t0, 1), at=now_tw())
+    budget = min(max(request.args.get("budget", 15, type=float), 5), 25)
+    batch = min(max(request.args.get("batch", 20, type=int), 5), 60)
+    fresh = max(request.args.get("fresh", 240, type=float), 0)
+    if not PF_LOCK[m].acquire(blocking=False):
+        return jsonify(busy=True, reason="上一輪還在執行")
+    try:
+        now = time.time()
+        age = lambda k: now - QC[k][0] if k in QC else 1e9           # 沒抓過 = 最舊
+        todo = sorted((k for k in keys if age(k) >= fresh), key=age, reverse=True)  # 最久沒更新的先抓
+        done, err = 0, None
+        for i in range(0, len(todo), batch):
+            if time.time() - t0 > budget:   # 時間預算用完：不再開新的一批（正在跑的那批最多再花幾秒）
+                break
+            try:
+                live_cached(todo[i:i + batch], maxage=0)
+                done += len(todo[i:i + batch])
+            except Exception as e:           # Yahoo 限流或逾時：這輪先停，下一分鐘再試
+                err = str(e)[:150]; break
+        out = dict(market=m, total=len(keys), done=done, remaining=len(todo) - done,
                    seconds=round(time.time() - t0, 1), at=now_tw())
+        if err: out["error"] = err
+        return jsonify(out)
+    finally:
+        PF_LOCK[m].release()
 
 @app.get("/quote")
 def quote():
