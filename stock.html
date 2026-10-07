@@ -241,8 +241,9 @@ function lastClose(m,now=Date.now()){const tz=m=='TW'?'Asia/Taipei':'America/New
  return 0}
 // 這檔目前畫面上的價格來自哪個時間：live.json 的報價，或全市場名單（universe.json）的更新時間，取較新者
 function snapT(k){const s=S[k],a=ST[k]||0;return s&&s.snap&&UT?Math.max(a,tsOf(UT)):a}
-// 開盤中：報價在 5 分鐘內就算新；休市：報價是收盤（含 5 分鐘緩衝）之後抓的，就是最終價，不必再抓
-function isFresh(k){const m=k.slice(0,2),t=snapT(k);if(!t)return false;return isOpen(m)?Date.now()-t<3e5:t>=lastClose(m)+3e5}
+// 開盤中：報價在 FRESH_OPEN_MS（10 分鐘）內就算新；休市：報價是收盤（含 5 分鐘緩衝）之後抓的，就是最終價，不必再抓
+const FRESH_OPEN_MS=6e5; // 盤中快照 10 分鐘內算新：Actions 每 5 分鐘一輪，加上執行與發佈時間；想更即時可改小，但開頁面時要補抓的股票會變多
+function isFresh(k){const m=k.slice(0,2),t=snapT(k);if(!t)return false;return isOpen(m)?Date.now()-t<FRESH_OPEN_MS:t>=lastClose(m)+3e5}
 function stamp(src,t,warn){const e=$('stamp');if(!e)return;if(!warn){LAST={src,t}}const n=new Date(),p=x=>String(x).padStart(2,'0');e.style.color=warn?'#e5484d':'';e.textContent=(warn?'':'🕒 ')+src+'・最新抓取 '+(t||'—')+'・'+['TW','US'].map(m=>(m=='TW'?'台股':'美股')+(isOpen(m)?'開盤中':'休市')).join('、')+'・畫面刷新 '+p(n.getHours())+':'+p(n.getMinutes())+':'+p(n.getSeconds())}
 async function pget(p){const r=await fetch(PROXY_URL+p);if(!r.ok)throw new Error(r.status);return r.json()}
 async function loadStock(s){snapDetail(s);const key=s.m+s.code;
