@@ -117,17 +117,33 @@ def extra_symbols(u=None):
             out += [(m, x[0], x[1]) for x in rows[:n_top] if (m, x[0]) not in have]
     return out
 
+LIVE_KEEP_DAYS = 2  # live.json 逐檔保留天數：這次沒抓的股票（例如另一個市場）沿用上次的報價，超過就剔除
+
 def live():
     mk = "TW" if dt.datetime.now(dt.timezone.utc).hour < 8 else "US"  # 台股時段抓台股、美股時段抓美股
     extra = [e for e in extra_symbols() if e[0] == mk]
     print(f"精選名單 + 額外 {len(extra)} 檔（{mk}）")
-    ft = dt.datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
+    now = dt.datetime.now(TZ)
+    ft = now.strftime("%Y-%m-%d %H:%M:%S")
+    attempted = {m + c for m, c, _ in symbols() + extra}  # 這次有嘗試抓的股票
     data = {}
     for key, v in fetch("5d", extra).items():
         d = v["df"]; x = d.iloc[-1]
-        data[key] = {"t": d.index[-1].strftime("%m-%d"), "o": r(x.Open), "h": r(x.High),
-                     "l": r(x.Low), "p": r(x.Close), "v": vol(v["m"], x.Volume),
+        data[key] = {"t": d.index[-1].strftime("%m-%d"), "o": r(x.Open), "h": r(x.High), "l": r(x.Low),
+                     "p": r(x.Close), "v": vol(v["m"], x.Volume),
                      "pc": r(d.iloc[-2].Close) if len(d) > 1 else None, "ft": ft}
+    # 沒有嘗試抓的股票（另一個市場的額外名單）保留上次的報價，超過保留天數的剔除；
+    # 這次嘗試抓卻失敗的不保留，避免把舊價格當成新的。
+    try:
+        old = json.load(open(f"{OUT}/live.json", encoding="utf-8"))["data"]
+    except Exception:
+        old = {}
+    cutoff = (now - dt.timedelta(days=LIVE_KEEP_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
+    kept = 0
+    for key, v in old.items():
+        if key not in attempted and key not in data and str(v.get("ft", "")) >= cutoff:
+            data[key] = v; kept += 1
+    print(f"live.json：本次 {len(data) - kept} 檔 + 保留舊資料 {kept} 檔")
     write("live.json", data, merge=False)
 
 def details(res):
