@@ -1,5 +1,5 @@
 """Cloud Run 轉接服務：/quote?keys=TW2330,USNVDA（盤中報價）、/stock?key=TW2330&name=台積電（K線+股利+公司資訊+新聞）"""
-import json, os, re, threading, time, datetime as dt, urllib.parse, urllib.request, xml.etree.ElementTree as ET, difflib, email.utils
+import gc, json, os, re, signal, threading, time, datetime as dt, urllib.parse, urllib.request, xml.etree.ElementTree as ET, difflib, email.utils
 import pandas as pd, yfinance as yf
 from flask import Flask, jsonify, request
 from fetch_data import download, extra_symbols, gnews, r, vol
@@ -14,9 +14,14 @@ def cached(key, ttl, fn):
     if hit and time.time() - hit[0] < ttl:
         return hit[1]
     v = fn()
-    if len(CACHE) > 1500:
-        CACHE.clear()
-    CACHE[key] = (time.time(), v)
+    if len(CACHE) >= 300:   # 個股詳情每筆可達數十 KB：先清掉過期的，還是太多就丟掉最舊的一半
+        now = time.time()
+        for k in [k for k, h in CACHE.items() if now - h[0] >= h[2]]:
+            del CACHE[k]
+        if len(CACHE) >= 300:
+            for k in sorted(CACHE, key=lambda k: CACHE[k][0])[:150]:
+                del CACHE[k]
+    CACHE[key] = (time.time(), v, ttl)
     return v
 
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36"}
@@ -127,6 +132,43 @@ def merge_news(*groups):
             z = dict(x); z["srcs"] = [x.get("provider") or x.get("s") or "未知"]; merged.append(z)
     return merged[:10]
 
+START = time.time()
+RSS_LIMIT_MB = int(os.environ.get("RSS_LIMIT_MB", 300))            # 常駐記憶體超過這個值，就讓 worker 優雅重啟（Cloud Run 預設上限 512 MiB）
+RECYCLE_MIN_UPTIME = int(os.environ.get("RECYCLE_MIN_UPTIME", 600))  # 啟動後至少這麼久才允許重啟，避免設定太低造成連續重啟
+WD = {"t": 0.0, "rss": 0.0}
+
+def rss_mb():
+    try:
+        for line in open("/proc/self/status"):
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1]) / 1024
+    except Exception:
+        pass
+    return 0.0
+
+def trim_memory():
+    """把 Python 已經不用、但 glibc 還沒還給系統的記憶體釋放掉（多執行緒服務常見的「只增不減」）。"""
+    gc.collect()
+    try:
+        import ctypes
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        pass
+
+@app.after_request
+def memory_watchdog(resp):
+    now = time.time()
+    if now - WD["t"] >= 60:   # 最多每分鐘整理 / 檢查一次，成本很低
+        WD["t"] = now
+        trim_memory()
+        WD["rss"] = rss_mb()
+        if (RSS_LIMIT_MB > 0 and WD["rss"] > RSS_LIMIT_MB and now - START > RECYCLE_MIN_UPTIME
+                and request.environ.get("SERVER_SOFTWARE", "").startswith("gunicorn")):
+            print(f"記憶體 {WD['rss']:.0f} MB 超過 {RSS_LIMIT_MB} MB，worker 優雅重啟（先處理完進行中的請求）", flush=True)
+            WD["t"] = now + 300
+            threading.Timer(2, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()   # 等這次回應送出後再重啟
+    return resp
+
 @app.after_request
 def cors(resp):
     resp.headers["Access-Control-Allow-Origin"] = ALLOW
@@ -205,19 +247,22 @@ def prefetch_keys(m):
     if time.time() - LISTS["t"] > 1800:
         base = os.environ["DATA_BASE"].rstrip("/")
         get = lambda f: json.load(urllib.request.urlopen(urllib.request.Request(f"{base}/{f}", headers={"User-Agent": "stock-proxy"}), timeout=30))["data"]
-        u, h = get("universe.json"), get("history.json")
-        LISTS["keys"] = {mm: {k for k in h if k.startswith(mm)} for mm in ("TW", "US")}
+        h = get("history.json")
+        keys = {mm: {k for k in h if k.startswith(mm)} for mm in ("TW", "US")}
+        del h   # 兩個大檔不要同時留在記憶體
+        u = get("universe.json")
         for mm, c, _ in extra_symbols(u):
-            LISTS["keys"][mm].add(mm + c)
-        LISTS["t"] = time.time()
+            keys[mm].add(mm + c)
+        del u
+        LISTS["keys"], LISTS["t"] = keys, time.time()
     return sorted(LISTS["keys"][m])
 
-SNAP = {"t": 0, "ts": {}}   # GitHub 排程資料（live.json）每檔報價的抓取時間（epoch 秒），每 60 秒重新載入一次
+SNAP = {"t": 0, "ts": {}}   # GitHub 排程資料（live.json）每檔報價的抓取時間（epoch 秒），每 2 分鐘重新載入一次
 
 def snap_times():
     """讀 GitHub 上 live.json 每檔的抓取時間，讓預抓可以跳過 GitHub 已經夠新的股票（資源優先放在 GitHub，Cloud Run 只補缺口）。
     載入失敗就沿用舊資料，不影響預抓（最差只是退回「全部都當作過期」）。"""
-    if time.time() - SNAP["t"] > 60:
+    if time.time() - SNAP["t"] > 120:
         SNAP["t"] = time.time()   # 失敗也先記時間，避免每次請求都重試而拖慢
         try:
             base = os.environ["DATA_BASE"].rstrip("/")
@@ -291,7 +336,8 @@ def prefetch():
             except Exception as e:           # Yahoo 限流或逾時：這輪先停，下一分鐘再試
                 err = str(e)[:150]; break
         out = dict(market=m, total=len(keys), stale=stale, done=done, remaining=stale - done,
-                   seconds=round(time.time() - t0, 1), at=now_tw())
+                   seconds=round(time.time() - t0, 1), at=now_tw(),
+                   rss_mb=round(WD["rss"] or rss_mb()), uptime_min=round((time.time() - START) / 60))
         if err: out["error"] = err
         return jsonify(out)
     finally:
