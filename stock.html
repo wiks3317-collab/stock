@@ -182,10 +182,16 @@ async function loadHistory(){try{const h=await getJSON('history.json');let n=0;
  real=n>0;recalc();render();
  $('note').innerHTML='資料來源：Yahoo Finance，由 GitHub Actions 定時抓取（可能有延遲）。K 線更新：'+h.updated+'。';loadExtras()}
  catch(e){console.warn('無法載入 history.json，維持示範資料',e)}}
-async function loadQuotes(){try{const q=await getJSON('live.json');stamp('排程資料（GitHub Actions）',q.updated);applyQ(q);for(const k in q.data){GOT.add(k);const t=tsOf(q.data[k].ft);if(t)ST[k]=t}}catch(e){console.warn('live.json 載入失敗',e)}}
+async function loadQuotes(quiet){try{const q=await getJSON('live.json');if(!quiet)stamp('排程資料（GitHub Actions）',q.updated);
+ // 定期重載時，只套用比畫面上更新的報價，避免把較舊的排程資料蓋掉剛從 Cloud Run 抓到的價格
+ const d={};for(const k in q.data){GOT.add(k);const t=tsOf(q.data[k].ft);if(t)ST[k]=Math.max(ST[k]||0,t);if(!(t&&t<=(APPLIED[k]||0)))d[k]=q.data[k]}
+ applyQ({...q,data:d})}catch(e){console.warn('live.json 載入失敗',e)}}
 function demoTick(){all().forEach(s=>{const l=s.k[s.k.length-1];if(Math.random()<.5){l.c*=1+(Math.random()-.5)*.004;l.h=Math.max(l.h,l.c);l.l=Math.min(l.l,l.c);l.v*=1+Math.random()*.003}})}
 setInterval(async()=>{if(!liveOn)return;tk++;
- if(PROXY_URL){if(document.hidden||!LOADED)return;const ph=phase('TW')+phase('US');if(ph!==PH){if(PH)FETCHED.clear();PH=ph}const per=tk%(VIS.length<=30?5:VIS.length<=60?10:20)==0,need=VIS.some(k=>!FETCHED.has(k));if(!per&&!need)return;if(await proxyQuotes(!per)===false&&real&&tk%20==0)await loadQuotes()}else if(real){if(tk%20)return;await loadQuotes()}else demoTick();
+ if(PROXY_URL){if(document.hidden||!LOADED)return;const ph=phase('TW')+phase('US');if(ph!==PH){if(PH)FETCHED.clear();PH=ph}const idle=Date.now()-LASTACT>IDLE_MS,sync=tk%40==0; // sync：約每 2 分鐘載入一次 GitHub 排程資料（靜態檔，不花 Cloud Run）
+  if(sync)await loadQuotes(true);
+  if(idle){if(tk%10==0)stamp('⏸ 已閒置超過 15 分鐘，暫停即時更新（點一下畫面即恢復）',null,1);if(!sync)return}
+  else{const per=tk%POLL_TICKS==0,need=VIS.some(k=>!FETCHED.has(k));if(!per&&!need){if(!sync)return}else if(await proxyQuotes(!per)===false&&real&&tk%20==0)await loadQuotes()}}else if(real){if(tk%20)return;await loadQuotes()}else demoTick();
  recalc();if($('ov').style.display!='block')render();else if((real||PROXY_URL)&&cur&&cur[2]==0)detail(cur[0],cur[1],0)},3000);
 const MAP={'半導體業':'電子','電腦及週邊':'電子','光電業':'電子','通信網路':'電子','電子零組件':'電子','電子通路':'電子','資訊服務':'電子','其他電子':'電子','數位雲端':'電子','生技醫療':'生技醫療','航運業':'運輸','觀光餐旅':'百貨零售','貿易百貨':'百貨零售','居家生活':'百貨零售','電子商務':'百貨零售','運動休閒':'百貨零售','金融保險':'金融','建材營造':'營建','綠能環保':'綠能環保','ETF':'ETF','興櫃':'興櫃'};
 const USMAP={'Information Technology':'科技','Health Care':'生技醫療','Financials':'金融','Industrials':'工業運輸','Consumer Discretionary':'零售百貨','Consumer Staples':'零售百貨','Energy':'能源','Utilities':'公用事業','Materials':'原物料','Real Estate':'不動產','Communication Services':'通訊媒體','ETF':'ETF'};
@@ -225,10 +231,18 @@ let VIS=[],LOADED=false,PH='',FETCHED=new Set(),GOT=new Set(),LAST={src:'',t:''}
 // 開盤時段（含前後 5 分鐘緩衝）；假日休市不會判斷，遇到國定假日只是多查幾次舊資料
 function isOpen(m,d=new Date()){const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:m=='TW'?'Asia/Taipei':'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));
  if(p.weekday=='Sat'||p.weekday=='Sun')return false;const t=(+p.hour%24)*60+ +p.minute,[a,b]=m=='TW'?[535,815]:[565,965];return t>=a&&t<=b}
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)tk=Math.ceil(tk/5)*5-1});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){tk=Math.ceil(tk/POLL_TICKS)*POLL_TICKS-1;LASTACT=Date.now()}});
 // 交易階段：台股 08:55 / 13:35 / 15:35、美股 09:25 / 16:05 為分界；階段或日期改變時，重新抓一次畫面上的報價
 function phase(m,d=new Date()){const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:m=='TW'?'Asia/Taipei':'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));
  const t=(+p.hour%24)*60+ +p.minute,b=m=='TW'?[535,815,935]:[565,965,1e9];return m+p.year+p.month+p.day+(t<b[0]?0:t<b[1]?1:t<b[2]?2:3)}
+// ── 省資源設定：大部分資料靠 GitHub 排程（免費），Cloud Run 只負責畫面最上面的即時價和快照過期的缺口 ──
+const POLL_TICKS=10;      // 即時輪詢間隔：10 個 tick × 3 秒 = 30 秒（想更即時改小，但 Cloud Run 用量會等比增加）
+const POLL_TOP=30;        // 輪詢時只向 Cloud Run 要畫面最上面這幾檔（外加快照過期的）；其餘靠 GitHub 排程資料
+const IDLE_MS=15*60*1000; // 閒置超過 15 分鐘就暫停向 Cloud Run 輪詢（仍每約 2 分鐘載入一次 GitHub 資料）
+let LASTACT=Date.now();
+const APPLIED={};         // 代號 → 最近一次套用 Cloud Run 報價的時間（避免被較舊的排程資料蓋回去）
+function touch(){if(Date.now()-LASTACT>IDLE_MS)tk=Math.ceil(tk/POLL_TICKS)*POLL_TICKS-1;LASTACT=Date.now()} // 閒置後第一次操作：下一個 tick 就更新
+['pointerdown','keydown','wheel','touchstart','scroll'].forEach(e=>addEventListener(e,touch,{passive:true,capture:true}));
 // ── 快照新鮮度：判斷「GitHub 排程資料」夠不夠新，夠新就不必再打 Cloud Run ──
 const ST={}; // 代號 → 該檔 live.json 報價的抓取時間（毫秒）
 const zp=(tz,d)=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',weekday:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));
@@ -259,15 +273,15 @@ function applyQ(q){for(const key in q.data){const s=S[key],x=q.data[key];if(!s)c
    if(x.comparison)s._sourceMeta={quote:'Yahoo Finance',fetched:q.updated||'',compare:x.comparison};
    const l=s.k[s.k.length-1];if(l.t!==x.t){s.k.push({t:x.t,o:x.o,h:x.h,l:x.l,c:x.p,v:x.v});if(s.k.length>135)s.k.shift()}else{l.c=x.p;l.h=Math.max(l.h,x.h);l.l=Math.min(l.l,x.l);l.v=x.v}}}
 async function proxyQuotes(force){if(BUSY)return true;let ks=[...new Set([...(cur?[cur[0]]:[]),...VIS])];
- ks=(force?ks.filter(k=>{if(FETCHED.has(k))return false;if(isFresh(k)){FETCHED.add(k);GOT.add(k);return false}return true}):ks.filter(k=>isOpen(k.slice(0,2)))).slice(0,120);
+ ks=(force?ks.filter(k=>{if(FETCHED.has(k))return false;if(isFresh(k)){FETCHED.add(k);GOT.add(k);return false}return true}):[...new Set([...(cur?[cur[0]]:[]),...VIS.slice(0,POLL_TOP),...ks.filter(k=>!isFresh(k))])].filter(k=>isOpen(k.slice(0,2)))).slice(0,120);
  if(!ks.length){if(!force)stamp(LAST.src,LAST.t);return true}
  if(Date.now()-FAILT<30000)return false;
  BUSY=true;if(force&&$('stamp'))$('stamp').textContent='⏳ 更新報價中…';
  try{const ch=[];for(let i=0;i<ks.length;i+=40)ch.push(ks.slice(i,i+40));
   let ok=0,bad=0;
   await Promise.allSettled(ch.map(async c=>{
-   try{const q=await pget('/quote?keys='+c.join(',')+(force?'&maxage=330':'')+(cur&&c.includes(cur[0])?'&cmp='+cur[0]:''));
-    c.forEach(k=>{FETCHED.add(k);GOT.add(k)});stamp('即時報價（Cloud Run／Yahoo）',q.updated);applyQ(q);ok++;
+   try{const q=await pget('/quote?keys='+c.join(',')+(force?'&maxage=600':'')+(cur&&c.includes(cur[0])?'&cmp='+cur[0]:''));
+    c.forEach(k=>{FETCHED.add(k);GOT.add(k);ST[k]=APPLIED[k]=Date.now()});stamp('即時報價（Cloud Run／Yahoo）',q.updated);applyQ(q);ok++;
     if($('ov').style.display!='block'){recalc();render()} // 一批回來就先顯示，不必等全部
    }catch(e){bad++;console.warn('proxy quote chunk',e)}}));
   if(bad)FAILT=Date.now(); // 有失敗的批次：30 秒後再試，已成功的批次照常使用
