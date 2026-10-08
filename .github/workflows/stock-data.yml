@@ -32,6 +32,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip   # 快取套件，每次執行少花約 20~40 秒
       - run: pip install -r requirements.txt
       - name: 決定模式
         run: |
