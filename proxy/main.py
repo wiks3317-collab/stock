@@ -212,6 +212,27 @@ def prefetch_keys(m):
         LISTS["t"] = time.time()
     return sorted(LISTS["keys"][m])
 
+SNAP = {"t": 0, "ts": {}}   # GitHub 排程資料（live.json）每檔報價的抓取時間（epoch 秒），每 60 秒重新載入一次
+
+def snap_times():
+    """讀 GitHub 上 live.json 每檔的抓取時間，讓預抓可以跳過 GitHub 已經夠新的股票（資源優先放在 GitHub，Cloud Run 只補缺口）。
+    載入失敗就沿用舊資料，不影響預抓（最差只是退回「全部都當作過期」）。"""
+    if time.time() - SNAP["t"] > 60:
+        SNAP["t"] = time.time()   # 失敗也先記時間，避免每次請求都重試而拖慢
+        try:
+            base = os.environ["DATA_BASE"].rstrip("/")
+            req = urllib.request.Request(f"{base}/live.json?t={int(time.time() // 60)}", headers={"User-Agent": "stock-proxy"})
+            d = json.load(urllib.request.urlopen(req, timeout=10))["data"]
+            tz = dt.timezone(dt.timedelta(hours=8))
+            SNAP["ts"] = {k: dt.datetime.strptime(v["ft"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz).timestamp()
+                          for k, v in d.items() if v.get("ft")}
+        except Exception as e:
+            print("live.json 載入失敗：", repr(e), flush=True)
+    return SNAP["ts"]
+
+PF_LOG = []   # (時間, 檔數)：預抓最近 1 小時向 Yahoo 抓了幾檔
+PF_MAX_PER_HOUR = int(os.environ.get("PREFETCH_MAX_KEYS_PER_HOUR", 1500))   # 每小時上限：GitHub 長時間掛掉時，避免預抓把 Cloud Run 免費額度吃光
+
 PF_LOCK = {"TW": threading.Lock(), "US": threading.Lock()}  # 同一市場同時只跑一個預抓，避免排程重疊互相搶資源
 
 @app.route("/prefetch", methods=["GET", "POST"])
@@ -219,7 +240,7 @@ def prefetch():
     """給外部排程（cron-job.org 等）定時呼叫：開盤中把常見股票的報價先抓進快取。
     預設是「限時滾動」模式：每次呼叫只抓最久沒更新的那幾批，超過時間預算（budget 秒）就不再開新的一批並立刻回應，
     所以單次請求一定在排程服務的 30 秒逾時內結束；名單很長也沒關係，排程每分鐘呼叫一次，會一批接一批輪流更新。
-      /prefetch?m=TW                    → 預設：預算 15 秒、每批 20 檔、5 分鐘內抓過的先跳過
+      /prefetch?m=TW                    → 預設：預算 15 秒、每批 20 檔、8 分鐘內（Cloud Run 或 GitHub 任一邊）抓過的先跳過
       /prefetch?m=TW&budget=12&batch=15 → 自訂（budget 5~25 秒、batch 5~60 檔、fresh 為「幾秒內抓過就跳過」）
       /prefetch?m=TW&part=0&parts=3     → 舊的固定分份模式（一次抓完該份，不限時）
     不使用背景執行緒，所以 Cloud Run 不需要開「CPU 一律分配」，維持請求計費。"""
@@ -244,23 +265,32 @@ def prefetch():
         return jsonify(market=m, part=part, parts=parts, count=len(keys), seconds=round(time.time() - t0, 1), at=now_tw())
     budget = min(max(request.args.get("budget", 15, type=float), 5), 25)
     batch = min(max(request.args.get("batch", 20, type=int), 5), 60)
-    fresh = max(request.args.get("fresh", 240, type=float), 0)
+    fresh = max(request.args.get("fresh", 480, type=float), 0)
     if not PF_LOCK[m].acquire(blocking=False):
         return jsonify(busy=True, reason="上一輪還在執行")
     try:
         now = time.time()
-        age = lambda k: now - QC[k][0] if k in QC else 1e9           # 沒抓過 = 最舊
+        snap = snap_times()
+        # 一檔股票的「新鮮度」= Cloud Run 快取與 GitHub 快照中較新的那個；夠新就不抓
+        age = lambda k: min(now - QC[k][0] if k in QC else 1e9, now - snap[k] if k in snap else 1e9)
         todo = sorted((k for k in keys if age(k) >= fresh), key=age, reverse=True)  # 最久沒更新的先抓
+        stale = len(todo)
+        PF_LOG[:] = [x for x in PF_LOG if x[0] > now - 3600]
+        room = PF_MAX_PER_HOUR - sum(n for _, n in PF_LOG)
+        if stale and room <= 0:
+            return jsonify(market=m, capped=True, stale=stale, cap_per_hour=PF_MAX_PER_HOUR, reason="已達每小時上限，等 GitHub 資料恢復")
+        todo = todo[:max(room, 0)]
         done, err = 0, None
         for i in range(0, len(todo), batch):
             if time.time() - t0 > budget:   # 時間預算用完：不再開新的一批（正在跑的那批最多再花幾秒）
                 break
+            chunk = todo[i:i + batch]
             try:
-                live_cached(todo[i:i + batch], maxage=0)
-                done += len(todo[i:i + batch])
+                live_cached(chunk, maxage=0)
+                done += len(chunk); PF_LOG.append((time.time(), len(chunk)))
             except Exception as e:           # Yahoo 限流或逾時：這輪先停，下一分鐘再試
                 err = str(e)[:150]; break
-        out = dict(market=m, total=len(keys), done=done, remaining=len(todo) - done,
+        out = dict(market=m, total=len(keys), stale=stale, done=done, remaining=stale - done,
                    seconds=round(time.time() - t0, 1), at=now_tw())
         if err: out["error"] = err
         return jsonify(out)
