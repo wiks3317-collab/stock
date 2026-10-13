@@ -4,35 +4,165 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="googlebot" content="noindex, nofollow">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E📈%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <title>股票資訊儀表板</title>
 <style>
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light;--bg:#f6f7f9;--card:#fff;--tx:#1f2328;--mu:#6b7280;--bd:#d0d7de;--gut:#eef0f3;--ac:#2563eb;--up:#e5484d;--dn:#2fa36b;--prifg:#fff}
-@media (prefers-color-scheme:dark){:root:not([data-theme]){color-scheme:dark;--bg:#0f1115;--card:#171a21;--tx:#e6e8eb;--mu:#9aa3af;--bd:#2d333b;--gut:#1e232b;--ac:#4c8dff;--up:#ff6b6b;--dn:#55c98a;--prifg:#fff}}
-html[data-theme=light]{color-scheme:light;--bg:#f6f7f9;--card:#fff;--tx:#1f2328;--mu:#6b7280;--bd:#d0d7de;--gut:#eef0f3;--ac:#2563eb;--up:#e5484d;--dn:#2fa36b;--prifg:#fff}
-html[data-theme=dark]{color-scheme:dark;--bg:#0f1115;--card:#171a21;--tx:#e6e8eb;--mu:#9aa3af;--bd:#2d333b;--gut:#1e232b;--ac:#4c8dff;--up:#ff6b6b;--dn:#55c98a;--prifg:#fff}
+/* ───────── 設計代幣（主題變數；7 組主題名稱與 index.html 共用，請勿改名） ───────── */
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light;
+ --bg:#f4f5f6;--card:#fff;--tx:#20262b;--mu:#75808a;--bd:#e4e7ea;--gut:#eceff1;--ac:#3d6079;--up:#c2453f;--dn:#3b8c6a;--prifg:#fff;
+ --font:"Inter","PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,-apple-system,sans-serif;--pad:clamp(16px,3vw,40px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme]){color-scheme:dark;--bg:#13171a;--card:#1a1f23;--tx:#e5e9ec;--mu:#8a949c;--bd:#2a3136;--gut:#232a2f;--ac:#8db4cf;--up:#ec6a64;--dn:#5cc596;--prifg:#10171c}}
+html[data-theme=light]{color-scheme:light;--bg:#f4f5f6;--card:#fff;--tx:#20262b;--mu:#75808a;--bd:#e4e7ea;--gut:#eceff1;--ac:#3d6079;--up:#c2453f;--dn:#3b8c6a;--prifg:#fff}
+html[data-theme=dark]{color-scheme:dark;--bg:#13171a;--card:#1a1f23;--tx:#e5e9ec;--mu:#8a949c;--bd:#2a3136;--gut:#232a2f;--ac:#8db4cf;--up:#ec6a64;--dn:#5cc596;--prifg:#10171c}
 html[data-theme=sepia]{color-scheme:light;--bg:#f1e8d4;--card:#fbf5e6;--tx:#3b3226;--mu:#7d705c;--bd:#d9cbaa;--gut:#efe4c9;--ac:#a8652a;--up:#b84a3a;--dn:#3f8a58;--prifg:#fff}
 html[data-theme=forest]{color-scheme:light;--bg:#eaf2ec;--card:#f8fcf9;--tx:#1d2b22;--mu:#5f7566;--bd:#c3d6c8;--gut:#dfeae2;--ac:#2f855a;--up:#c94b4b;--dn:#2f855a;--prifg:#fff}
 html[data-theme=ocean]{color-scheme:dark;--bg:#0b1e2d;--card:#10293c;--tx:#dbe9f4;--mu:#8fa9bd;--bd:#1f4059;--gut:#0d2335;--ac:#2bb3d9;--up:#ff6b6b;--dn:#55d6a0;--prifg:#04202c}
 html[data-theme=dracula]{color-scheme:dark;--bg:#1e1f29;--card:#282a36;--tx:#f8f8f2;--mu:#a0a4c0;--bd:#44475a;--gut:#2f3140;--ac:#bd93f9;--up:#ff6e6e;--dn:#50fa7b;--prifg:#1e1f29}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 -apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;transition:background-color .15s,color .15s}
-header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--card);border-bottom:1px solid var(--bd);padding:10px 12px;z-index:5}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}h1{font-size:17px;margin:0 8px 0 0}button,input{font:inherit;color:var(--tx)}
-.chip{border:1px solid var(--bd);background:var(--card);padding:4px 11px;border-radius:16px;cursor:pointer;white-space:nowrap}.chip.on{background:var(--ac);border-color:var(--ac);color:var(--prifg)}input{border:1px solid var(--bd);background:var(--bg);border-radius:8px;padding:5px 9px;flex:1;min-width:120px}.scroll{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 2px}
-.note{margin:8px 12px;padding:8px 10px;border-radius:8px;background:var(--card);border:1px dashed var(--bd);color:var(--mu);font-size:12px}main{padding:0 12px 40px;max-width:1600px;margin:auto}.sec{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin:12px 0;overflow:hidden}.sec h2{font-size:15px;margin:0;padding:10px 12px;border-bottom:1px solid var(--bd)}
-.industry-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(340px,calc((100% - 28px)/3)),1fr));gap:14px;margin:12px 0}.industry-grid .sec{margin:0;min-width:0;width:100%;overflow:hidden}.industry-grid .tw{overflow-x:hidden}.industry-grid table{width:100%;min-width:0;table-layout:fixed}.industry-grid th,.industry-grid td{overflow:hidden;text-overflow:ellipsis}.industry-grid th:first-child,.industry-grid td:first-child{width:34%;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.industry-grid th:nth-child(2),.industry-grid td:nth-child(2){width:16%}.industry-grid th:nth-child(3),.industry-grid td:nth-child(3){width:18%}.industry-grid th:nth-child(4),.industry-grid td:nth-child(4){width:20%}.industry-grid th:nth-child(5),.industry-grid td:nth-child(5){width:12%}@media(max-width:380px){.industry-grid{grid-template-columns:1fr;gap:10px}.industry-grid .tw{overflow-x:auto}.industry-grid table{table-layout:auto;min-width:430px}}
-.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:430px}th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--bd)}th:first-child,td:first-child{text-align:left}th{color:var(--mu);font-weight:500;font-size:12px}tr.stale td:nth-child(n+2){opacity:.4}
-tr.r{cursor:pointer}tr.r:hover{background:var(--bg)}.tag{font-size:11px;padding:0 6px;border-radius:8px;background:var(--bg);color:var(--mu);margin-left:4px}.star{cursor:pointer;color:var(--mu);margin-right:4px}.star.on{color:#f5a623}.up{color:var(--up)}.dn{color:var(--dn)}
-#ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:10;overflow:auto}#md{background:var(--card);max-width:860px;margin:env(safe-area-inset-top,0px) auto 0;min-height:100%;padding:12px}canvas{width:100%;height:340px;display:block}.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.kv div{background:var(--bg);border-radius:8px;padding:8px}.kv b{display:block;font-size:12px;color:var(--mu);font-weight:500}.news{padding:8px 0;border-bottom:1px solid var(--bd)}.news small{color:var(--mu)}
-.theme-box{display:flex;align-items:center;gap:6px;margin-left:auto}.theme-label{font-size:12px;color:var(--mu)}.theme-sw{width:21px;height:21px;border-radius:50%;padding:0;border:2px solid var(--bd);cursor:pointer;flex:0 0 auto}.theme-sw:hover{border-color:var(--ac)}.theme-sw.on{outline:2px solid var(--ac);outline-offset:2px}.theme-sw[data-t="light"]{background:#fff}.theme-sw[data-t="dark"]{background:#171a21}.theme-sw[data-t="sepia"]{background:#f1e8d4}.theme-sw[data-t="forest"]{background:#2f855a}.theme-sw[data-t="ocean"]{background:#10293c}.theme-sw[data-t="dracula"]{background:#bd93f9}.theme-sw[data-t="system"]{background:linear-gradient(135deg,#fff 50%,#171a21 50%)}
-@media(max-width:760px){.theme-box{width:100%;margin-left:0}.theme-label{display:none}.theme-sw{width:20px;height:20px}}
+
+/* ───────── 基礎 ───────── */
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 var(--font);-webkit-font-smoothing:antialiased;transition:background-color .15s,color .15s}
+button,input{font:inherit;color:var(--tx)}
+button{cursor:pointer}
+a{color:var(--ac)}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.wrap{max-width:1440px;margin:0 auto;padding:0 var(--pad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* ───────── 按鈕（預設：安靜的細框小按鈕） ───────── */
+.chip{border:1px solid var(--bd);background:var(--card);padding:5px 12px;border-radius:6px;white-space:nowrap;transition:background-color .15s,color .15s,border-color .15s}
+.chip:hover{border-color:var(--mu)}
+.chip.on{background:var(--ac);border-color:var(--ac);color:var(--prifg)}
+
+/* ───────── 頂部列 ───────── */
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--bd)}
+@supports (backdrop-filter:blur(8px)){header{background:color-mix(in srgb,var(--card) 90%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding:14px 0 4px}
+h1{margin:0 8px 0 0;font-size:18px;font-weight:600;letter-spacing:-.01em}
+.seg{display:inline-flex;gap:2px;padding:3px;background:var(--gut);border-radius:8px}
+.seg .chip{border:0;background:none;color:var(--mu);padding:5px 16px}
+.seg .chip.on{background:var(--card);color:var(--tx);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+input{flex:1 1 200px;max-width:340px;min-width:0;border:1px solid var(--bd);background:var(--bg);border-radius:8px;padding:7px 12px;transition:border-color .15s,background-color .15s}
+input::placeholder{color:var(--mu)}
+input:focus{outline:none;border-color:var(--ac);background:var(--card);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 18%,transparent)}
+
+/* 主題色點 */
+.theme-box{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;margin-left:auto}
+.theme-sw{width:16px;height:16px;border-radius:50%;padding:0;border:1px solid var(--bd);flex:none;transition:transform .15s}
+.theme-sw:hover{transform:scale(1.18)}
+.theme-sw.on{box-shadow:0 0 0 2px var(--card),0 0 0 3.5px var(--ac)}
+.theme-sw[data-t="light"]{background:#fff}.theme-sw[data-t="dark"]{background:#171a21}.theme-sw[data-t="sepia"]{background:#f1e8d4}.theme-sw[data-t="forest"]{background:#2f855a}.theme-sw[data-t="ocean"]{background:#10293c}.theme-sw[data-t="dracula"]{background:#bd93f9}.theme-sw[data-t="system"]{background:linear-gradient(135deg,#fff 50%,#171a21 50%)}
+
+/* 分類頁籤（底線式） */
+.scroll,.tabs{gap:4px}
+.scroll{display:flex;overflow-x:auto;scrollbar-width:none;margin:0 calc(var(--pad) * -1);padding:0 var(--pad)}
+.scroll::-webkit-scrollbar{display:none}
+.scroll .chip,.tabs .chip{border:0;border-radius:0;background:none;color:var(--mu);padding:11px 12px}
+.scroll .chip:first-child,.tabs .chip:first-child{padding-left:0}
+.scroll .chip:hover,.tabs .chip:hover{color:var(--tx)}
+.scroll .chip.on,.tabs .chip.on{background:none;color:var(--tx);box-shadow:inset 0 -2px 0 var(--ac)}
+
+/* ───────── 狀態列與說明 ───────── */
+.status{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding-top:16px;font-size:12px}
+#stamp{color:var(--mu);font-size:12px}
+.chip.live{border:0;background:none;padding:2px 0;font-size:12px;color:var(--mu)}
+.chip.live.on{background:none;color:var(--ac)}
+.note{margin:10px 0 0;padding:10px 14px;border-radius:8px;background:var(--gut);color:var(--mu);font-size:12px;line-height:1.6}
+
+/* ───────── 內容區 ───────── */
+main{max-width:1440px;margin:0 auto;padding:16px var(--pad) 64px}
+.sec{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin:0 0 20px;overflow:hidden;container-type:inline-size}
+.sec h2{margin:0;padding:18px 20px 12px;font-size:15px;font-weight:600}
+.sec h2 small{margin-left:8px;color:var(--mu);font-weight:400;font-size:12px}
+.industry-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:20px;align-items:start}
+.industry-grid .sec{margin:0;min-width:0}
+.empty{margin:0;padding:8px 20px 24px;color:var(--mu)}
+
+/* 表格 */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:11px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--bd)}
+th:first-child,td:first-child{text-align:left;white-space:normal;padding-left:20px}
+th:last-child,td:last-child{padding-right:20px}
+tr:last-child td{border-bottom:0}
+th{padding-top:8px;padding-bottom:8px;color:var(--mu);font-weight:400;font-size:12px}
+td:nth-child(3){font-weight:500}
+td:nth-child(5){color:var(--mu)}
+tr.stale td:nth-child(n+2){opacity:.4}
+tr.r{cursor:pointer;transition:background-color .12s}
+tr.r:hover{background:color-mix(in srgb,var(--tx) 4%,transparent)}
+/* 卡片較窄時，先收掉次要欄位（熱度 → 成交量），避免橫向捲動 */
+@container (max-width:460px){th:nth-child(5),td:nth-child(5){display:none}}
+@container (max-width:340px){th:nth-child(4),td:nth-child(4){display:none}}
+
+.rk{display:inline-block;min-width:1.5em;margin-right:4px;color:var(--mu);font-size:12px}
+.cd{margin-right:8px;color:var(--mu);font-size:13px}
+.tag{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:var(--gut);color:var(--mu);font-size:11px;line-height:18px;vertical-align:1px}
+.tag.nm{margin:4px 0 0}
+.star{display:inline-block;margin:-4px 2px -4px -6px;padding:4px 6px;color:var(--mu);cursor:pointer;user-select:none}
+.star.on{color:#d9a441}
+.up{color:var(--up)}.dn{color:var(--dn)}
+
+/* ───────── 個股詳細頁 ───────── */
+#ov{position:fixed;inset:0;display:none;z-index:10;overflow:auto;overscroll-behavior:contain;background:rgba(20,26,31,.45);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+#md{background:var(--card);max-width:880px;margin:max(4vh,env(safe-area-inset-top,0px)) auto 4vh;padding:28px 32px 32px;border:1px solid var(--bd);border-radius:14px}
+.mh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.mt{font-size:18px;font-weight:600}
+.px{margin:12px 0 20px;font-size:36px;font-weight:600;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.px small{margin-left:8px;font-size:15px;font-weight:500;letter-spacing:0}
+.row.tabs{margin-bottom:16px;border-bottom:1px solid var(--bd)}
+.row.rg{margin:0 0 8px}
+.rg small{margin-left:auto;font-size:12px}
+#md p{margin:16px 0 0}
+#md h3{margin:28px 0 8px;font-size:14px;font-weight:600}
+#md th:first-child,#md td:first-child{padding-left:0}
+#md th:last-child,#md td:last-child{padding-right:0}
+canvas{display:block;width:100%;height:340px}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));column-gap:20px;margin-top:8px;border-top:1px solid var(--bd)}
+.kv div{padding:14px 0;border-bottom:1px solid var(--bd);font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
+.kv b{display:block;margin-bottom:2px;color:var(--mu);font-size:12px;font-weight:400}
+.news{padding:14px 0;border-bottom:1px solid var(--bd)}
+.news small{display:block;margin-top:2px;color:var(--mu)}
+
+/* ───────── 響應式 ───────── */
+@media (max-width:720px){
+ .bar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px}
+ h1{margin:0;font-size:17px}
+ .theme-box{grid-column:2;grid-row:1;gap:6px}
+ .seg{grid-column:1;grid-row:2}
+ input{grid-column:2;grid-row:2;max-width:none;font-size:16px}
+ .sec h2{padding:16px 16px 10px}
+ th:first-child,td:first-child{padding-left:16px}
+ th:last-child,td:last-child{padding-right:16px}
+ th,td{padding-left:8px;padding-right:8px}
+}
+@media (max-width:640px){
+ #md{min-height:100%;margin:env(safe-area-inset-top,0px) 0 0;padding:20px 16px 32px;border:0;border-radius:0}
+ .px{font-size:30px}
+ .rg small{margin-left:0;width:100%}
+}
+@media (pointer:coarse){
+ .theme-sw{width:20px;height:20px}
+ .scroll .chip,.tabs .chip{padding-top:13px;padding-bottom:13px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head><body>
 <header>
- <div class="row"><h1>📈 股票資訊</h1>
-  <button class="chip on" id="mTW">台股</button><button class="chip" id="mUS">美股</button>
-  <input id="q" placeholder="搜尋代號 / 名稱">
-  <button class="chip on" id="live">● 即時更新</button><span id="stamp" style="color:var(--mu);font-size:12px"></span><div class="theme-box" aria-label="網頁顏色主題"><span class="theme-label">主題</span><button class="theme-sw" data-theme-choice="system" data-t="system" title="跟隨系統" aria-label="跟隨系統"></button><button class="theme-sw" data-theme-choice="light" data-t="light" title="亮色" aria-label="亮色"></button><button class="theme-sw" data-theme-choice="dark" data-t="dark" title="暗色" aria-label="暗色"></button><button class="theme-sw" data-theme-choice="sepia" data-t="sepia" title="復古暖色" aria-label="復古暖色"></button><button class="theme-sw" data-theme-choice="forest" data-t="forest" title="森林綠" aria-label="森林綠"></button><button class="theme-sw" data-theme-choice="ocean" data-t="ocean" title="海洋藍" aria-label="海洋藍"></button><button class="theme-sw" data-theme-choice="dracula" data-t="dracula" title="Dracula" aria-label="Dracula"></button></div></div>
- <div class="scroll" id="inds"></div>
+ <div class="wrap">
+  <div class="bar">
+   <h1>股票資訊</h1>
+   <div class="seg" role="group" aria-label="市場"><button class="chip on" id="mTW">台股</button><button class="chip" id="mUS">美股</button></div>
+   <input id="q" type="search" placeholder="搜尋代號或名稱" aria-label="搜尋代號或名稱">
+   <div class="theme-box" aria-label="網頁顏色主題"><button class="theme-sw" data-theme-choice="system" data-t="system" title="跟隨系統" aria-label="跟隨系統"></button><button class="theme-sw" data-theme-choice="light" data-t="light" title="亮色" aria-label="亮色"></button><button class="theme-sw" data-theme-choice="dark" data-t="dark" title="暗色" aria-label="暗色"></button><button class="theme-sw" data-theme-choice="sepia" data-t="sepia" title="復古暖色" aria-label="復古暖色"></button><button class="theme-sw" data-theme-choice="forest" data-t="forest" title="森林綠" aria-label="森林綠"></button><button class="theme-sw" data-theme-choice="ocean" data-t="ocean" title="海洋藍" aria-label="海洋藍"></button><button class="theme-sw" data-theme-choice="dracula" data-t="dracula" title="Dracula" aria-label="Dracula"></button></div>
+  </div>
+  <div class="scroll" id="inds"></div>
+ </div>
 </header>
-<div class="note" id="note">資料載入中：熱門/分類資料來自 GitHub Actions；盤中優先使用 Cloud Run + Yahoo Finance。若有第二來源，會顯示交叉比對結果。</div>
+<div class="wrap">
+ <div class="status"><button class="chip live on" id="live">● 即時更新</button><span id="stamp"></span></div>
+ <div class="note" id="note">資料載入中：熱門/分類資料來自 GitHub Actions；盤中優先使用 Cloud Run + Yahoo Finance。若有第二來源，會顯示交叉比對結果。</div>
+</div>
 <main id="main"></main>
 <div id="ov"><div id="md"></div></div>
 <script>
@@ -73,29 +203,29 @@ function ind_(s){if(s.snap){const k=s.k;s.p=k[1].c;s.pv=k[0].c;s.chg=s.pv?(s.p/s
 const all=()=>Object.values(S);
 function recalc(){all().forEach(ind_)}recalc();
 const cls=(s,v)=>(s.m=='TW'?v>=0:v<0)?'up':'dn';
-const col=(m,up)=>(m=='TW')==up?'#e5484d':'#2fa36b';
+const col=(m,up)=>getComputedStyle(document.documentElement).getPropertyValue((m=='TW')==up?'--up':'--dn').trim();
 const f2=n=>n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fv=s=>{const v=s.k[s.k.length-1].v;return s.m=='TW'?Math.round(v).toLocaleString()+' 張':(v/1e6).toFixed(1)+'M 股'};
-function row(s,i){VIS.push(s.m+s.code);const st=fav.includes(s.m+s.code);return `<tr class="r${PROXY_URL&&!GOT.has(s.m+s.code)?' stale':''}" data-k="${s.m+s.code}"><td><span class="star ${st?'on':''}" data-f="${s.m+s.code}">${st?'★':'☆'}</span>${i?i+'. ':''}${s.code} ${s.name}${s.tags.slice(0,2).map(t=>`<span class="tag">${t}</span>`).join('')}</td><td class="${cls(s,s.chg)}">${f2(s.p)}</td><td class="${cls(s,s.chg)}">${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</td><td>${fv(s)}</td><td>${Math.round(s.score)}</td></tr>`}
+function row(s,i){VIS.push(s.m+s.code);const st=fav.includes(s.m+s.code);return `<tr class="r${PROXY_URL&&!GOT.has(s.m+s.code)?' stale':''}" data-k="${s.m+s.code}"><td><span class="star ${st?'on':''}" data-f="${s.m+s.code}">${st?'★':'☆'}</span>${i?`<span class="rk">${i}</span>`:''}<span class="cd">${s.code}</span>${s.name}${s.tags.slice(0,2).map(t=>`<span class="tag">${t}</span>`).join('')}</td><td class="${cls(s,s.chg)}">${f2(s.p)}</td><td class="${cls(s,s.chg)}">${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</td><td>${fv(s)}</td><td>${Math.round(s.score)}</td></tr>`}
 const th='<div class="tw"><table><tr><th>股票</th><th>現價</th><th>漲跌幅</th><th>成交量</th><th>熱度</th></tr>';
 function render(){VIS=[];const m=$('main'),T=TREE[mkt];
- $('inds').innerHTML=['🔥 全市場熱門','⭐ 自選',...Object.keys(T)].map(x=>`<button class="chip ${x==ind?'on':''}" data-i="${x}">${x}</button>`).join('');
+ $('inds').innerHTML=['🔥 全市場熱門','⭐ 自選',...Object.keys(T)].map(x=>`<button class="chip ${x==ind?'on':''}" data-i="${x}">${x.replace(/^[^\p{L}\p{N}]+/u,'')}</button>`).join('');
  let h='';
  if(q){const r=all().filter(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase())).slice(0,50);h=`<div class="sec"><h2>搜尋結果（${r.length}） <small style="color:var(--mu)">熱門/分類名單外亦會透過 Yahoo Finance 搜尋</small></h2>${th}${r.map(s=>row(s)).join('')}</table></div></div>`}
  else if(ind=='🔥 全市場熱門'){const r=all().filter(s=>s.m==mkt).sort((a,b)=>b.score-a.score).slice(0,20);h=`<div class="sec"><h2>${mkt=='TW'?'台股':'美股'}全市場熱門 Top 20</h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}
- else if(ind=='⭐ 自選'){const r=all().filter(s=>fav.includes(s.m+s.code));h=`<div class="sec"><h2>自選股（${r.length}）</h2>${r.length?th+r.map(s=>row(s)).join('')+'</table></div>':'<p style="padding:12px;color:var(--mu)">點股票左側的 ☆ 加入自選</p>'}</div>`}
- else {h='<div class="industry-grid">';const groups=T[ind]||{};for(const sub in groups){const r=[...groups[sub]].filter(s=>s&&s.m==mkt).sort((a,b)=>b.score-a.score).slice(0,10);if(!r.length)continue;h+=`<div class="sec"><h2>${ind} › ${sub}　<small style="color:var(--mu)">Top ${r.length}</small></h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}if(!h.includes('class="sec"'))h+='<div class="sec"><p style="padding:12px;color:var(--mu)">目前沒有可顯示的分類資料。</p></div>';h+='</div>'}
+ else if(ind=='⭐ 自選'){const r=all().filter(s=>fav.includes(s.m+s.code));h=`<div class="sec"><h2>自選股（${r.length}）</h2>${r.length?th+r.map(s=>row(s)).join('')+'</table></div>':'<p class="empty">點股票左側的 ☆ 加入自選</p>'}</div>`}
+ else {h='<div class="industry-grid">';const groups=T[ind]||{};for(const sub in groups){const r=[...groups[sub]].filter(s=>s&&s.m==mkt).sort((a,b)=>b.score-a.score).slice(0,10);if(!r.length)continue;h+=`<div class="sec"><h2>${ind} › ${sub}　<small style="color:var(--mu)">Top ${r.length}</small></h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}if(!h.includes('class="sec"'))h+='<div class="sec"><p class="empty">目前沒有可顯示的分類資料。</p></div>';h+='</div>'}
  m.innerHTML=h}
 function news(s){const a=['法人上修目標價，看好後市接單動能','外資買超，股價量能放大','公布最新月營收，年增表現受市場關注','宣布擴產計畫，產能預計逐步開出','產業供應鏈傳出新訂單消息'];const r=rng(s.r+new Date().getDate());
  return [0,1,2,3].map(i=>`<div class="news">${s.name}${a[Math.floor(r()*a.length)]}<br><small>${String(8+i*2).padStart(2,'0')}:${String(Math.floor(r()*59)).padStart(2,'0')} ・ 示範範例標題</small></div>`).join('')}
 function detail(key,range=90,tab=0){const s=S[key];if(!s)return;if(s.snap)return PROXY_URL?loadStock(s):snapDetail(s);const r=rng(s.r+9),us=s.m=='US',d=new Date(),ex=new Date(+d+(10+Math.floor(r()*60))*864e5),pay=new Date(+ex+25*864e5),cash=us?(.2+r()*1.2):(.5+r()*6);
  const hi=Math.max(...s.k.map(x=>x.h)),lo=Math.min(...s.k.map(x=>x.l));
  const sig=[s.p>s.m5?'站上5日線':'跌破5日線',s.p>s.m20?'站上月線':'跌破月線',s.p>s.m60?'站上季線':'跌破季線',s.rsi>70?'RSI 過熱':s.rsi<30?'RSI 超賣':'RSI 中性',s.kd>80?'KD 高檔':s.kd<20?'KD 低檔':'KD 中性'];
- $('md').innerHTML=`<div class="row" style="justify-content:space-between"><div><b style="font-size:18px">${s.code} ${s.name}</b><br><span class="tag" style="margin:0">${us?'美股':'台股'} ・ ${s.i} › ${s.sub}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
- <div style="font-size:26px;margin:6px 0" class="${cls(s,s.chg)}">${f2(s.p)} <small>${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</small></div>
+ $('md').innerHTML=`<div class="mh"><div><b class="mt">${s.code} ${s.name}</b><br><span class="tag nm">${us?'美股':'台股'} ・ ${s.i} › ${s.sub}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
+ <div class="px ${cls(s,s.chg)}">${f2(s.p)} <small>${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</small></div>
  ${s._sourceMeta?`<div class="note" style="margin:6px 0">行情：${esc(s._sourceMeta.quote||'Yahoo Finance')} ・ 抓取：${esc(s._sourceMeta.fetched||'—')} ${s._sourceMeta.compare?`・ 比對：${esc(s._sourceMeta.compare.status)}${s._sourceMeta.compare.message?' — '+esc(s._sourceMeta.compare.message):''}`:''}</div>`:''}
- <div class="row" style="margin-bottom:8px">${['技術分析','公司資訊 / 除權息','今日新聞'].map((t,i)=>`<button class="chip ${i==tab?'on':''}" data-t="${i}">${t}</button>`).join('')}</div>
- ${tab==0?`<div class="row" style="margin-bottom:6px">${[30,60,90,130].map(n=>`<button class="chip ${n==range?'on':''}" data-r="${n}">${n}日</button>`).join('')}<small style="color:var(--mu)"><span style="color:#f5a623">━</span> 5日 <span style="color:#4a90e2">━</span> 月線(20) <span style="color:#a855f7">━</span> 季線(60)</small></div><canvas id="cv"></canvas>
+ <div class="row tabs">${['技術分析','公司資訊 / 除權息','今日新聞'].map((t,i)=>`<button class="chip ${i==tab?'on':''}" data-t="${i}">${t}</button>`).join('')}</div>
+ ${tab==0?`<div class="row rg">${[30,60,90,130].map(n=>`<button class="chip ${n==range?'on':''}" data-r="${n}">${n}日</button>`).join('')}<small style="color:var(--mu)"><span style="color:#c8963e">━</span> 5日 <span style="color:#5b86a8">━</span> 月線(20) <span style="color:#8f7aa8">━</span> 季線(60)</small></div><canvas id="cv"></canvas>
  <div class="kv" style="margin-top:8px"><div><b>5日線</b>${f2(s.m5)}</div><div><b>月線 (20)</b>${f2(s.m20)}</div><div><b>季線 (60)</b>${f2(s.m60)}</div><div><b>RSI(14)</b>${s.rsi.toFixed(1)}</div><div><b>KD 值(9)</b>${s.kd.toFixed(1)}</div><div><b>量比(對20日均量)</b>${s.vr.toFixed(2)}x</div></div>
  <p><b>訊號：</b>${sig.join('、')}${s.bull?'、<b>多頭排列</b>':''}</p>`
  :tab==1&&DET[key]?infoHtml(s,key):tab==1?`<div class="kv"><div><b>產業</b>${s.i} / ${s.sub}</div><div><b>市值（示範）</b>${(us?(50+r()*3000).toFixed(0)+' 億美元':(300+r()*30000).toFixed(0)+' 億元')}</div><div><b>本益比</b>${(8+r()*30).toFixed(1)}</div><div><b>EPS（近四季）</b>${(s.p/(8+r()*30)).toFixed(2)}</div><div><b>${130}日最高</b>${f2(hi)}</div><div><b>${130}日最低</b>${f2(lo)}</div></div>
@@ -115,7 +245,7 @@ function draw(s,range){const cv=$('cv'),dp=devicePixelRatio||1,W=cv.clientWidth,
   const y1=Y(Math.max(x.o,x.c)),hh=Math.max(1,Math.abs(Y(x.o)-Y(x.c)));c.fillRect(X(i)-bw*.35,y1,bw*.7,hh);
   const vh=x.v/mv*60;c.globalAlpha=.55;c.fillRect(X(i)-bw*.35,H-vh-14,bw*.7,vh);c.globalAlpha=1;
   if(i%Math.ceil(D.length/6)==0){c.fillStyle=css.getPropertyValue('--mu');c.fillText(x.t,X(i)-12,H-2)}});
- [[5,'#f5a623'],[20,'#4a90e2'],[60,'#a855f7']].forEach(([n,cl])=>{c.strokeStyle=cl;c.lineWidth=1.4;c.beginPath();let on=0;for(let i=0;i<D.length;i++){const m=ma(k,n,st+i);if(m==null)continue;on?c.lineTo(X(i),Y(m)):c.moveTo(X(i),Y(m));on=1}c.stroke()});c.lineWidth=1}
+ [[5,'#c8963e'],[20,'#5b86a8'],[60,'#8f7aa8']].forEach(([n,cl])=>{c.strokeStyle=cl;c.lineWidth=1.4;c.beginPath();let on=0;for(let i=0;i<D.length;i++){const m=ma(k,n,st+i);if(m==null)continue;on?c.lineTo(X(i),Y(m)):c.moveTo(X(i),Y(m));on=1}c.stroke()});c.lineWidth=1}
 // 主題：與 index.html 共用相同主題名稱與配色邏輯
 const THEME_KEY='tools-theme';
 const THEME_VALUES=['system','light','dark','sepia','forest','ocean','dracula'];
@@ -196,8 +326,8 @@ setInterval(async()=>{if(!liveOn)return;tk++;
 const MAP={'半導體業':'電子','電腦及週邊':'電子','光電業':'電子','通信網路':'電子','電子零組件':'電子','電子通路':'電子','資訊服務':'電子','其他電子':'電子','數位雲端':'電子','生技醫療':'生技醫療','航運業':'運輸','觀光餐旅':'百貨零售','貿易百貨':'百貨零售','居家生活':'百貨零售','電子商務':'百貨零售','運動休閒':'百貨零售','金融保險':'金融','建材營造':'營建','綠能環保':'綠能環保','ETF':'ETF','興櫃':'興櫃'};
 const USMAP={'Information Technology':'科技','Health Care':'生技醫療','Financials':'金融','Industrials':'工業運輸','Consumer Discretionary':'零售百貨','Consumer Staples':'零售百貨','Energy':'能源','Utilities':'公用事業','Materials':'原物料','Real Estate':'不動產','Communication Services':'通訊媒體','ETF':'ETF'};
 function snapDetail(s){const l=s.k[1],us=s.m=='US';
- $('md').innerHTML=`<div class="row" style="justify-content:space-between"><div><b style="font-size:18px">${esc(s.code)} ${esc(s.name)}</b><br><span class="tag" style="margin:0">${us?'美股':'台股'} ・ ${esc(s.i)} › ${esc(s.sub)}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
- <div style="font-size:26px;margin:6px 0" class="${cls(s,s.chg)}">${f2(s.p)} <small>${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</small></div>
+ $('md').innerHTML=`<div class="mh"><div><b class="mt">${esc(s.code)} ${esc(s.name)}</b><br><span class="tag nm">${us?'美股':'台股'} ・ ${esc(s.i)} › ${esc(s.sub)}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
+ <div class="px ${cls(s,s.chg)}">${f2(s.p)} <small>${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</small></div>
  <div class="kv"><div><b>開</b>${f2(l.o)}</div><div><b>高</b>${f2(l.h)}</div><div><b>低</b>${f2(l.l)}</div><div><b>昨收</b>${f2(s.pv)}</div><div><b>成交量</b>${fv(s)}</div></div>
  <p style="color:var(--mu)">此股票先以搜尋/全市場名單資料顯示；開啟詳細頁後會由 Cloud Run 即時向 Yahoo Finance 取得 K 線、公司資訊與新聞，並以第二來源做價格交叉檢查。</p>`;
  $('ov').style.display='block';$('md').onclick=e=>{if(e.target.id=='cl')$('ov').style.display='none'};cur=null}
@@ -258,7 +388,7 @@ function snapT(k){const s=S[k],a=ST[k]||0;return s&&s.snap&&UT?Math.max(a,tsOf(U
 // 開盤中：報價在 FRESH_OPEN_MS（10 分鐘）內就算新；休市：報價是收盤（含 5 分鐘緩衝）之後抓的，就是最終價，不必再抓
 const FRESH_OPEN_MS=6e5; // 盤中快照 10 分鐘內算新：Actions 每 5 分鐘一輪，加上執行與發佈時間；想更即時可改小，但開頁面時要補抓的股票會變多
 function isFresh(k){const m=k.slice(0,2),t=snapT(k);if(!t)return false;return isOpen(m)?Date.now()-t<FRESH_OPEN_MS:t>=lastClose(m)+3e5}
-function stamp(src,t,warn){const e=$('stamp');if(!e)return;if(!warn){LAST={src,t}}const n=new Date(),p=x=>String(x).padStart(2,'0');e.style.color=warn?'#e5484d':'';e.textContent=(warn?'':'🕒 ')+src+'・最新抓取 '+(t||'—')+'・'+['TW','US'].map(m=>(m=='TW'?'台股':'美股')+(isOpen(m)?'開盤中':'休市')).join('、')+'・畫面刷新 '+p(n.getHours())+':'+p(n.getMinutes())+':'+p(n.getSeconds())}
+function stamp(src,t,warn){const e=$('stamp');if(!e)return;if(!warn){LAST={src,t}}const n=new Date(),p=x=>String(x).padStart(2,'0');e.style.color=warn?'#e5484d':'';e.textContent=src+'・最新抓取 '+(t||'—')+'・'+['TW','US'].map(m=>(m=='TW'?'台股':'美股')+(isOpen(m)?'開盤中':'休市')).join('、')+'・畫面刷新 '+p(n.getHours())+':'+p(n.getMinutes())+':'+p(n.getSeconds())}
 async function pget(p){const r=await fetch(PROXY_URL+p);if(!r.ok)throw new Error(r.status);return r.json()}
 async function loadStock(s){snapDetail(s);const key=s.m+s.code;
  try{const d=await pget('/stock?key='+encodeURIComponent(key)+'&name='+encodeURIComponent(s.name));
