@@ -161,7 +161,7 @@ canvas{display:block;width:100%;height:340px}
 </header>
 <div class="wrap">
  <div class="status"><button class="chip live on" id="live">● 即時更新</button><span id="stamp"></span></div>
- <div class="note" id="note">資料載入中：熱門/分類資料來自 GitHub Actions；盤中優先使用 Cloud Run + Yahoo Finance。若有第二來源，會顯示交叉比對結果。</div>
+ <div class="note" id="note">資料載入中：資料來自 Yahoo Finance，由 GitHub Actions 盤中約每分鐘更新（實際可能有延遲）。</div>
 </div>
 <main id="main"></main>
 <div id="ov"><div id="md"></div></div>
@@ -271,7 +271,7 @@ $('q').oninput=e=>{
  const seq=++searchSeq;
  if(q.length>=1)searchTimer=setTimeout(async()=>{if(seq!==searchSeq||!q)return;
    const local=all().some(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase()));
-   if(local)return;
+   if(local||!PROXY_URL)return;
    try{const d=await pget('/search?q='+encodeURIComponent(q));if(seq!==searchSeq||!q)return;
      (d.data||[]).filter(x=>x.m==mkt).forEach(x=>{
        if(S[x.key])return;
@@ -306,13 +306,13 @@ async function loadExtras(){let ok=0;
  try{const d=await getJSON('details.json');DET=d.data;DET_AT=d.updated;ok++}catch(e){console.warn('details.json',e)}
  try{const d=await getJSON('news.json');NEWS=d.data;NEWS_AT=d.updated;ok++}catch(e){console.warn('news.json',e)}
  $('note').innerHTML+=ok?'公司資訊、除息資料來自 Yahoo Finance；新聞由 Google 新聞 + Yahoo Finance RSS 交叉整理。':'除權息、公司資訊、新聞暫無法取得。'}
-async function getJSON(f){const r=await fetch(DATA_URL+f+'?t='+Math.floor(Date.now()/6e4));if(!r.ok)throw new Error(f+' '+r.status);return r.json()}
+async function getJSON(f,res=6e4){const r=await fetch(DATA_URL+f+'?t='+Math.floor(Date.now()/res));if(!r.ok)throw new Error(f+' '+r.status);return r.json()}
 async function loadHistory(){try{const h=await getJSON('history.json');let n=0;
  for(const key in h.data){const s=S[key],a=h.data[key];if(!s||!a.length)continue;s.k=a.map(x=>({t:x[0],o:x[1],h:x[2],l:x[3],c:x[4],v:x[5]}));n++}
  real=n>0;recalc();render();
  $('note').innerHTML='資料來源：Yahoo Finance，由 GitHub Actions 定時抓取（可能有延遲）。K 線更新：'+h.updated+'。';loadExtras()}
  catch(e){console.warn('無法載入 history.json，維持示範資料',e)}}
-async function loadQuotes(quiet){try{const q=await getJSON('live.json');if(!quiet)stamp('排程資料（GitHub Actions）',q.updated);
+async function loadQuotes(quiet){try{const q=await getJSON('live.json',15e3);if(!quiet)stamp('GitHub Actions／Yahoo',q.updated);
  // 定期重載時，只套用比畫面上更新的報價，避免把較舊的排程資料蓋掉剛從 Cloud Run 抓到的價格
  const d={};for(const k in q.data){GOT.add(k);const t=tsOf(q.data[k].ft);if(t)ST[k]=Math.max(ST[k]||0,t);if(!(t&&t<=(APPLIED[k]||0)))d[k]=q.data[k]}
  applyQ({...q,data:d})}catch(e){console.warn('live.json 載入失敗',e)}}
@@ -321,7 +321,7 @@ setInterval(async()=>{if(!liveOn)return;tk++;
  if(PROXY_URL){if(document.hidden||!LOADED)return;const ph=phase('TW')+phase('US');if(ph!==PH){if(PH)FETCHED.clear();PH=ph}const idle=Date.now()-LASTACT>IDLE_MS,sync=tk%40==0; // sync：約每 2 分鐘載入一次 GitHub 排程資料（靜態檔，不花 Cloud Run）
   if(sync)await loadQuotes(true);
   if(idle){if(tk%10==0)stamp('⏸ 已閒置超過 15 分鐘，暫停即時更新（點一下畫面即恢復）',null,1);if(!sync)return}
-  else{const per=tk%POLL_TICKS==0,need=VIS.some(k=>!FETCHED.has(k));if(!per&&!need){if(!sync)return}else if(await proxyQuotes(!per)===false&&real&&tk%20==0)await loadQuotes()}}else if(real){if(tk%20)return;await loadQuotes()}else demoTick();
+  else{const per=tk%POLL_TICKS==0,need=VIS.some(k=>!FETCHED.has(k));if(!per&&!need){if(!sync)return}else if(await proxyQuotes(!per)===false&&real&&tk%20==0)await loadQuotes()}}else if(real){if(document.hidden||tk%POLL_TICKS)return;if(!isOpen('TW')&&!isOpen('US')&&tk%(POLL_TICKS*10))return;await loadQuotes()}else demoTick();
  recalc();if($('ov').style.display!='block')render();else if((real||PROXY_URL)&&cur&&cur[2]==0)detail(cur[0],cur[1],0)},3000);
 const MAP={'半導體業':'電子','電腦及週邊':'電子','光電業':'電子','通信網路':'電子','電子零組件':'電子','電子通路':'電子','資訊服務':'電子','其他電子':'電子','數位雲端':'電子','生技醫療':'生技醫療','航運業':'運輸','觀光餐旅':'百貨零售','貿易百貨':'百貨零售','居家生活':'百貨零售','電子商務':'百貨零售','運動休閒':'百貨零售','金融保險':'金融','建材營造':'營建','綠能環保':'綠能環保','ETF':'ETF','興櫃':'興櫃'};
 const USMAP={'Information Technology':'科技','Health Care':'生技醫療','Financials':'金融','Industrials':'工業運輸','Consumer Discretionary':'零售百貨','Consumer Staples':'零售百貨','Energy':'能源','Utilities':'公用事業','Materials':'原物料','Real Estate':'不動產','Communication Services':'通訊媒體','ETF':'ETF'};
@@ -329,7 +329,7 @@ function snapDetail(s){const l=s.k[1],us=s.m=='US';
  $('md').innerHTML=`<div class="mh"><div><b class="mt">${esc(s.code)} ${esc(s.name)}</b><br><span class="tag nm">${us?'美股':'台股'} ・ ${esc(s.i)} › ${esc(s.sub)}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
  <div class="px ${cls(s,s.chg)}">${f2(s.p)} <small>${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</small></div>
  <div class="kv"><div><b>開</b>${f2(l.o)}</div><div><b>高</b>${f2(l.h)}</div><div><b>低</b>${f2(l.l)}</div><div><b>昨收</b>${f2(s.pv)}</div><div><b>成交量</b>${fv(s)}</div></div>
- <p style="color:var(--mu)">此股票先以搜尋/全市場名單資料顯示；開啟詳細頁後會由 Cloud Run 即時向 Yahoo Finance 取得 K 線、公司資訊與新聞，並以第二來源做價格交叉檢查。</p>`;
+ <p style="color:var(--mu)">此股票只有全市場名單提供的報價（約每分鐘更新）；K 線、公司資訊與新聞僅提供精選名單內的股票。</p>`;
  $('ov').style.display='block';$('md').onclick=e=>{if(e.target.id=='cl')$('ov').style.display='none'};cur=null}
 function rebuildDynamicTree(){
  const next={TW:{},US:{}};
@@ -354,9 +354,9 @@ async function loadUniverse(){try{const u=await getJSON('universe.json');UT=u.up
  for(const m of ['TW','US']){const a=all().filter(s=>s.snap&&s.m==m).sort((p,q)=>p.k[1].c*p.k[1].v-q.k[1].c*q.k[1].v);a.forEach((s,i)=>s.tp=i/(a.length||1))}
  rebuildDynamicTree();recalc();render()
  }catch(e){console.warn('universe.json 載入失敗，只顯示精選名單',e)}}
-// 部署 Cloud Run 後，把服務網址貼在下一行（結尾不要加 /）；留空則只用 GitHub 排程資料
-const PROXY_URL='https://stock-proxy-885754386445.asia-east1.run.app';
-if(PROXY_URL)fetch(PROXY_URL+'/',{mode:'no-cors'}).catch(()=>{});
+// 即時報價轉接服務（Cloud Run）已停用，改由 GitHub Actions 盤中約每分鐘更新 data 分支的 live.json。
+// 若日後要重新啟用，把服務網址貼在下一行（結尾不要加 /）；留空則只用 GitHub 排程資料。
+const PROXY_URL='';
 let VIS=[],LOADED=false,PH='',FETCHED=new Set(),GOT=new Set(),LAST={src:'',t:''};
 // 開盤時段（含前後 5 分鐘緩衝）；假日休市不會判斷，遇到國定假日只是多查幾次舊資料
 function isOpen(m,d=new Date()){const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:m=='TW'?'Asia/Taipei':'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d).map(x=>[x.type,x.value]));

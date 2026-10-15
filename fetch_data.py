@@ -1,11 +1,15 @@
-"""用法：python fetch_data.py history | live | daily
+"""用法：python fetch_data.py history | live | daily | universe | session <TW|US>
+  session ：盤中常駐模式（取代 Cloud Run）。一次 workflow 跑完整個盤：每 LIVE_INTERVAL 秒（預設 60）抓一次即時價量，
+            每次直接推到 data 分支的 live.json；休市、假日或快到 6 小時上限時自動結束（必要時由 workflow 接力重啟）
   live    ：只更新即時價量（GitHub Actions 排程約每 5 分鐘；實際可能受 GitHub 排程延遲影響）
   history ：只更新 K 線
   daily   ：K 線 + 股利/公司資訊 + 新聞 + 全市場名單（收盤後每日）
   universe：只更新全市場名單與當日行情（台股上市/上櫃/興櫃/ETF、美股 S&P500+Nasdaq100+ETF）
 股票清單直接從 stock.html 的 RAW 區塊讀取；輸出資料夾由環境變數 OUT_DIR 指定（預設 data）。"""
 import datetime as dt, email.utils, io, json, os, re, sys, time
+import shutil, subprocess, tempfile
 import urllib.parse, urllib.request, xml.etree.ElementTree as ET
+from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import yfinance as yf
@@ -119,8 +123,9 @@ def extra_symbols(u=None):
 
 LIVE_KEEP_DAYS = 2  # live.json 逐檔保留天數：這次沒抓的股票（例如另一個市場）沿用上次的報價，超過就剔除
 
-def live():
-    mk = "TW" if dt.datetime.now(dt.timezone.utc).hour < 8 else "US"  # 台股時段抓台股、美股時段抓美股
+def live(mk=None, keep_min=0):
+    """keep_min > 0（session 模式用）：這次抓失敗的股票，若上次報價在 keep_min 分鐘內就沿用（ft 保留原本的抓取時間，不會被當成新價格）"""
+    mk = mk or ("TW" if dt.datetime.now(dt.timezone.utc).hour < 8 else "US")  # 台股時段抓台股、美股時段抓美股
     extra = [e for e in extra_symbols() if e[0] == mk]
     print(f"精選名單 + 額外 {len(extra)} 檔（{mk}）")
     now = dt.datetime.now(TZ)
@@ -139,12 +144,17 @@ def live():
     except Exception:
         old = {}
     cutoff = (now - dt.timedelta(days=LIVE_KEEP_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
+    keep_cut = (now - dt.timedelta(minutes=keep_min)).strftime("%Y-%m-%d %H:%M:%S") if keep_min else "~"
     kept = 0
     for key, v in old.items():
-        if key not in attempted and key not in data and str(v.get("ft", "")) >= cutoff:
+        oft = str(v.get("ft", ""))
+        if key not in data and oft >= cutoff and (key not in attempted or oft >= keep_cut):
             data[key] = v; kept += 1
     print(f"live.json：本次 {len(data) - kept} 檔 + 保留舊資料 {kept} 檔")
     write("live.json", data, merge=False)
+    today = dt.datetime.now(ZoneInfo(MKT[mk][0])).strftime("%m-%d")   # 該市場當地日期，用來判斷今天有沒有開盤
+    mine = [v for k, v in data.items() if k.startswith(mk) and v.get("ft") == ft]
+    return {"n": len(mine), "today": sum(1 for v in mine if v.get("t") == today)}
 
 def details(res):
     def one(kv):
@@ -318,6 +328,97 @@ def daily():
         except Exception as e:
             print(step.__name__, "失敗：", e)
 
+
+# ───────────── session 模式：盤中常駐（取代 Cloud Run 的 /prefetch 與 /quote） ─────────────
+# 時區, 開始（含開盤前 5 分）, 結束（含收盤後 5 分）, 正式開盤（分鐘，當地時間）
+MKT = {"TW": ("Asia/Taipei", 535, 815, 540), "US": ("America/New_York", 565, 965, 570)}
+
+def market_state(mk):
+    tz, a, b, _ = MKT[mk]
+    n = dt.datetime.now(ZoneInfo(tz)); m = n.hour * 60 + n.minute
+    if n.weekday() >= 5: return "closed", 0
+    if m < a: return "before", a - m
+    return ("open", 0) if m <= b else ("closed", 0)
+
+PUB = {}
+
+def _git(d, *a, check=True):
+    p = subprocess.run(["git", *a], cwd=d, capture_output=True, text=True)
+    if check and p.returncode:
+        tok = os.environ.get("GH_TOKEN", "\0")
+        raise RuntimeError(f"git {a[0]} 失敗：{p.stderr.strip()[:200]}".replace(tok, "***"))
+    return p
+
+def publish():
+    """把 OUT/live.json 推到 data 分支（只換這一個檔，分支維持 1 個 commit）。
+    每次先抓最新的 data 分支再換檔，並用 --force-with-lease：如果同時有 daily/universe 更新了其他檔案，不會被蓋掉。"""
+    d = PUB.get("dir")
+    if not d:
+        url = os.environ.get("PUB_REMOTE") or f"https://x-access-token:{os.environ['GH_TOKEN']}@github.com/{os.environ['GITHUB_REPOSITORY']}.git"
+        d = PUB["dir"] = tempfile.mkdtemp(prefix="livepub_")
+        for a in (("init", "-q", "-b", "data"), ("remote", "add", "origin", url),
+                  ("config", "user.name", "stock-bot"), ("config", "user.email", "stock-bot@users.noreply.github.com")):
+            _git(d, *a)
+    msg = "data live " + dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for _ in range(3):
+        base = None
+        if _git(d, "fetch", "-q", "--depth=1", "origin", "data", check=False).returncode == 0:
+            base = _git(d, "rev-parse", "FETCH_HEAD").stdout.strip()
+            _git(d, "checkout", "-q", "-f", "-B", "data", "FETCH_HEAD")
+        else:  # data 分支還不存在：第一次發佈，整個輸出資料夾一起放上去
+            shutil.copytree(OUT, d, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".git"))
+        shutil.copyfile(f"{OUT}/live.json", f"{d}/live.json")
+        _git(d, "add", "-A")
+        if base and _git(d, "diff", "--cached", "--quiet", check=False).returncode == 0:
+            return
+        _git(d, "commit", "-q", *(["--amend"] if base else []), "-m", msg)
+        if _git(d, "push", "-q", f"--force-with-lease=data:{base}" if base else "--force", "origin", "data", check=False).returncode == 0:
+            return
+        time.sleep(2)   # 被別的流程搶先更新了 data 分支：重新抓一次再來
+    raise RuntimeError("push 失敗：data 分支被同時更新，重試 3 次仍失敗")
+
+def _out(again):
+    f = os.environ.get("GITHUB_OUTPUT")
+    if f:
+        with open(f, "a") as fh: fh.write(f"again={'true' if again else 'false'}\n")
+    print("接力下一個 session" if again else "session 結束")
+
+def session(mk):
+    interval = int(os.environ.get("LIVE_INTERVAL", 60))
+    max_sec = int(os.environ.get("SESSION_MAX_MIN", 335)) * 60   # GitHub 單一 job 上限 6 小時：超過就交棒給下一個 session
+    t_start, fails, holiday = time.time(), 0, 0
+    print(f"session 開始：{mk}，每 {interval} 秒一輪，單次最長 {max_sec // 60} 分鐘")
+    while True:
+        st, wait = market_state(mk)
+        if st == "before" and wait <= 10:
+            print(f"距離開盤前緩衝還有 {wait} 分鐘，等待"); time.sleep(30); continue
+        if st != "open":
+            print("目前休市"); return _out(False)
+        t0, ok = time.time(), False
+        try:
+            stat = live(mk, keep_min=15)
+            if stat["n"]:
+                publish(); ok = True; fails = 0
+                print(f"發佈完成：{stat['n']} 檔，其中今天有新 K 棒 {stat['today']} 檔，耗時 {time.time() - t0:.0f} 秒", flush=True)
+                now = dt.datetime.now(ZoneInfo(MKT[mk][0]))
+                if now.hour * 60 + now.minute - MKT[mk][3] >= 10 and stat["n"] >= 20:   # 開盤 10 分鐘後，幾乎沒有股票有今天的資料 → 疑似國定假日
+                    holiday = holiday + 1 if stat["today"] / stat["n"] < 0.05 else 0
+                    if holiday >= 3:
+                        print("連續 3 輪都沒有今天的資料，判斷為休市日，結束"); return _out(False)
+            else:
+                print("這一輪沒有抓到任何資料", flush=True)
+        except Exception as e:
+            print("這一輪失敗：", repr(e), flush=True)
+        if not ok:
+            fails += 1
+        wait_s = interval * (2 ** min(fails, 3)) if fails else interval   # 連續失敗（例如被 Yahoo 限流）就拉長間隔
+        wait_s = max(wait_s - (time.time() - t0), 0)
+        if time.time() + wait_s - t_start > max_sec:
+            print("已達單次 session 上限"); return _out(market_state(mk)[0] == "open")
+        time.sleep(wait_s)
+
 if __name__ == "__main__":
     mode = sys.argv[1]
+    if mode == "session":
+        sys.exit(session(sys.argv[2] if len(sys.argv) > 2 else "TW"))
     {"history": lambda: save_history(fetch("8mo")), "live": live, "daily": daily, "universe": universe}[mode]()
