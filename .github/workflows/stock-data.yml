@@ -1,53 +1,89 @@
 name: stock-data
 on:
   schedule:
-    # 即時價量（live）以 cron-job.org 呼叫 workflow_dispatch 每 5 分鐘準時觸發為主；
-    # 下面兩行是備援（cron-job.org 或 token 失效時仍會更新），錯開整點避免跟主要觸發重複。
-    - cron: "2-59/15 1-5 * * 1-5"    # 台股盤中（UTC 1-5 = 台北 9-13）→ 即時價量（備援）
-    - cron: "2-59/15 13-22 * * 1-5"  # 覆蓋美股夏/冬令時間 → 即時價量（備援）
-    - cron: "30 7 * * 1-5"        # 台股收盤後較早更新全市場名單與當日行情（台北 15:30）
-    - cron: "30 10 * * 1-5"       # 台股收盤後 → K 線 + 股利 + 新聞
-    - cron: "30 22 * * 1-5"       # 美股收盤後 → K 線 + 股利 + 新聞
+    # ── 盤中即時 session（取代 Cloud Run）：一次 workflow 跑完整個盤，每分鐘抓一次價量並推到 data 分支 ──
+    # 主要由 cron-job.org 在開盤前用 workflow_dispatch 啟動（準時）；下面是 GitHub 自己的備援與「保險」：
+    # 如果 session 中途掛掉，下一個保險排程會在它結束後自動接手（同一時間只會有一個 session 在跑，其餘排隊）。
+    - cron: "55 0 * * 1-5"         # 台股開盤前（台北 08:55）
+    - cron: "25 13,14 * * 1-5"     # 美股開盤前（夏令 13:25 UTC、冬令 14:25 UTC；休市的那個會直接結束，不花時間）
+    - cron: "15,45 1-5 * * 1-5"    # 台股盤中保險
+    - cron: "15,45 14-20 * * 1-5"  # 美股盤中保險
+    # ── 收盤後的每日更新（不變）──
+    - cron: "30 7 * * 1-5"         # 台股收盤後較早更新全市場名單與當日行情（台北 15:30）
+    - cron: "30 10 * * 1-5"        # 台股收盤後 → K 線 + 股利 + 新聞
+    - cron: "30 22 * * 1-5"        # 美股收盤後 → K 線 + 股利 + 新聞
   workflow_dispatch:
     inputs:
       mode:
-        description: "live / history / daily / universe"
+        description: "session（盤中常駐）/ live（單次即時）/ history / daily / universe"
         default: "daily"
+      market:
+        description: "mode=session 時使用：TW 或 US"
+        default: "TW"
 permissions:
   contents: write
-concurrency: stock-data
+  actions: write   # session 超過 6 小時要接力時，用來啟動下一個 session
+# session 用獨立的 concurrency 群組：整個盤都占著它，不會擋住收盤後的 daily / universe；
+# 同群組最多 1 個執行中 + 1 個排隊，多出來的觸發會自動被取代（不會重複跑）。
+concurrency:
+  group: ${{ ((github.event_name == 'workflow_dispatch' && inputs.mode == 'session') || contains(fromJSON('["55 0 * * 1-5","25 13,14 * * 1-5","15,45 1-5 * * 1-5","15,45 14-20 * * 1-5"]'), github.event.schedule)) && 'stock-live' || 'stock-data' }}
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 355
     steps:
+      - name: 決定模式（休市就直接跳過，不花時間安裝套件）
+        run: |
+          S="${{ github.event.schedule }}"; MK="${{ inputs.market }}"; SKIP=0
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then M="${{ inputs.mode }}"
+          elif [ "$S" = "30 7 * * 1-5" ]; then M=universe
+          elif [ "$S" = "30 10 * * 1-5" ] || [ "$S" = "30 22 * * 1-5" ]; then M=daily
+          else M=session; fi
+          if [ "$M" = "session" ]; then
+            if [ "${{ github.event_name }}" = "schedule" ]; then   # 排程觸發時沒有 market 輸入：UTC 8 點以前當台股時段、之後當美股時段
+              if [ "$(date -u +%H)" -lt 8 ]; then MK=TW; else MK=US; fi
+            fi
+            case "$MK" in
+              TW) TZN=Asia/Taipei; A=535 ;;
+              US) TZN=America/New_York; A=565 ;;
+              *) echo "market 必須是 TW 或 US"; exit 1 ;;
+            esac
+            B=$((A+280)); [ "$MK" = US ] && B=$((A+400))
+            W=$(TZ=$TZN date +%u); HM=$(TZ=$TZN date +%H:%M); MIN=$((10#${HM%:*}*60+10#${HM#*:}))
+            if [ "$W" -ge 6 ] || [ "$MIN" -lt $((A-10)) ] || [ "$MIN" -gt "$B" ]; then SKIP=1; echo "目前 $MK 休市（$TZN $HM），不需要啟動"; fi
+          fi
+          echo "MODE=$M" >> "$GITHUB_ENV"; echo "MARKET=$MK" >> "$GITHUB_ENV"; echo "SKIP=$SKIP" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
+        if: env.SKIP != '1'
       - name: 取得既有的 data 分支（第一次執行時不存在，會略過）
+        if: env.SKIP != '1'
         uses: actions/checkout@v4
         continue-on-error: true
         with:
           ref: data
           path: pub
-      - run: mkdir -p pub
-      - uses: actions/setup-python@v5
+      - if: env.SKIP != '1'
+        run: mkdir -p pub
+      - if: env.SKIP != '1'
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip   # 快取套件，每次執行少花約 20~40 秒
-      - run: pip install -r requirements.txt
-      - name: 決定模式
-        run: |
-          S="${{ github.event.schedule }}"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then M="${{ inputs.mode }}"
-          elif [ "$S" = "30 7 * * 1-5" ]; then M=universe
-          elif [ "$S" = "30 10 * * 1-5" ] || [ "$S" = "30 22 * * 1-5" ]; then M=daily
-          else M=live; fi
-          echo "MODE=$M" >> "$GITHUB_ENV"
-      - run: python fetch_data.py "$MODE"
+      - if: env.SKIP != '1'
+        run: pip install -r requirements.txt
+      - name: 執行
+        id: fetch
+        if: env.SKIP != '1'
+        run: python fetch_data.py "$MODE" "$MARKET"
         env:
           OUT_DIR: pub
           TW_TOP: "20"   # live.json 涵蓋的額外名單：台股每個產業前 20 檔（畫面每區只顯示前 10，多留餘裕）
           US_TOP: "10"   # 美股每個 GICS 子產業前 10 檔（等於幾乎涵蓋 S&P500 + Nasdaq100）
+          LIVE_INTERVAL: "60"     # session：每幾秒抓一輪（實際間隔不會短於「抓一輪所需的時間」）
+          SESSION_MAX_MIN: "335"  # session：單次最長分鐘數（GitHub 單一 job 上限 6 小時），超過會接力
+          GH_TOKEN: ${{ github.token }}
       - name: 發佈到 data 分支（每次覆蓋，只保留 1 個 commit）
+        if: env.SKIP != '1' && env.MODE != 'session'   # session 模式已經在程式裡每分鐘自己發佈了
         run: |
           cd pub
           rm -rf .git
@@ -57,3 +93,8 @@ jobs:
           git add -A
           git commit -q -m "data ${MODE} $(date -u +%FT%TZ)"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+      - name: 盤還沒收就接力下一個 session（美股盤超過 6 小時用）
+        if: env.SKIP != '1' && env.MODE == 'session' && steps.fetch.outputs.again == 'true'
+        run: gh workflow run stock-data.yml --ref "${{ github.ref_name }}" -f mode=session -f market="$MARKET"
+        env:
+          GH_TOKEN: ${{ github.token }}
