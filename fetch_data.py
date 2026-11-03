@@ -503,7 +503,16 @@ def _kind(v):
     v = str(v).strip()
     return ("權息" if "權" in v and "息" in v else "權" if "權" in v else "息") if v and set(v) <= set("除權息") else None
 
-def _ex_generic(arr):  # OpenAPI 的欄位名稱不固定，依「值的樣子」辨識：日期、代號、名稱、權/息、金額
+def _pick(it, pats, bad=r"date|日期|增資|increase|subscri|price|價|ratio|率"):
+    """依欄位名稱挑數值；排除名稱含日期／增資／價格／比率的欄位，以及長得像民國日期（7 位數）的值"""
+    for k, v in it:
+        kl = k.lower()
+        if any(re.search(p, kl) for p in pats) and not re.search(bad, kl) and not re.fullmatch(r"\d{7}", str(v).strip()):
+            n = num(v)
+            if n:
+                return n
+
+def _ex_generic(arr, mk):  # OpenAPI 的欄位名稱不固定：日期／代號／名稱／權息依「值的樣子」辨識，金額與配股率依欄位名稱
     out = []
     for r_ in arr:
         it = [(k, v) for k, v in r_.items() if isinstance(v, str)]
@@ -513,8 +522,9 @@ def _ex_generic(arr):  # OpenAPI 的欄位名稱不固定，依「值的樣子�
             continue
         name = next((v.strip() for _, v in it[ci + 1:] if re.search(r"\D", v) and not _kind(v)), "")
         kind = next((_kind(v) for _, v in it if _kind(v)), "")
-        amt = next((num(v) for k, v in it if re.search(r"權值|息值|現金股利|Dividend", k) and num(v)), None)
-        out.append([date, it[ci][1].strip(), name, kind, amt])
+        cash = _pick(it, [r"現金股利", r"cash.?div", r"cashdiv"])
+        stock = _pick(it, [r"無償", r"stock.?div", r"bonus", r"free.?share"], bad=r"date|日期|增資|increase|subscri|price|價")
+        out.append([date, it[ci][1].strip(), name, kind, cash, stock, mk])
     return out
 
 def _ex_twse():
@@ -523,7 +533,7 @@ def _ex_twse():
         j = jget("https://www.twse.com.tw/rwd/zh/exRight/TWT48U?response=json")
         f = j["fields"]; ix = lambda k: next(i for i, x in enumerate(f) if x.startswith(k))
         iD, iC, iN, iK, iV = ix("資料日期"), ix("股票代號"), ix("股票名稱"), ix("權/息"), ix("權值+息值")
-        rows = [[roc_date(r_[iD]), r_[iC].strip(), r_[iN].strip(), str(r_[iK]).strip(), num(r_[iV])] for r_ in j.get("data", [])]
+        rows = [[roc_date(r_[iD]), r_[iC].strip(), r_[iN].strip(), str(r_[iK]).strip(), num(r_[iV]) if str(r_[iK]).strip() == "息" else None, None, "TWSE"] for r_ in j.get("data", [])]
         rows = [x for x in rows if x[0]]
         if rows:
             return rows
@@ -531,7 +541,7 @@ def _ex_twse():
     except Exception as e:
         errs.append(f"rwd {type(e).__name__}:{str(e)[:50]}")
     try:
-        rows = _ex_generic(jget("https://openapi.twse.com.tw/v1/exchangeReport/TWT48U_ALL"))
+        rows = _ex_generic(jget("https://openapi.twse.com.tw/v1/exchangeReport/TWT48U_ALL"), "TWSE")
         if rows:
             return rows
         errs.append("openapi 沒有資料")
@@ -540,12 +550,26 @@ def _ex_twse():
     raise RuntimeError(" / ".join(errs))
 
 def _ex_tpex():
-    rows = _ex_generic(jget("https://www.tpex.org.tw/openapi/v1/tpex_exright_prepost"))
+    rows = _ex_generic(jget("https://www.tpex.org.tw/openapi/v1/tpex_exright_prepost"), "TPEx")
     if not rows:
         raise RuntimeError("沒有資料")
     return rows
 
-def exdiv():  # 除權除息預告：[日期, 代號, 名稱, 權/息, 金額(權值+息值)]；回傳 (資料, 失敗訊息)
+def exdiv_enrich(rows, old_rows, fetch):
+    """補上近四季 EPS 與股價（Yahoo），用來算配息率、殖利率。fetch=False（每小時更新）時沿用上次的數值。
+    回傳列格式：[日期, 代號, 名稱, 權/息, 現金股利, 無償配股率, EPS, 股價, 市場]"""
+    old = {x[1]: x[6:8] for x in (old_rows or []) if len(x) >= 9}
+    def one(c):
+        time.sleep(0.3)
+        try:
+            i = yf.Ticker(c[0] + (".TWO" if c[1] == "TPEx" else ".TW")).info or {}
+            return c[0], [i.get("trailingEps"), i.get("currentPrice") or i.get("regularMarketPrice") or i.get("previousClose")]
+        except Exception:
+            return c[0], None
+    got = dict(pmap(one, sorted({(x[1], x[6]) for x in rows if x[4]}))) if fetch else {}
+    return [x[:6] + (got.get(x[1]) or old.get(x[1]) or [None, None]) + [x[6]] for x in rows]
+
+def exdiv():  # 除權除息預告（上市＋上櫃）；回傳 (資料, 失敗訊息)
     out, errs = [], []
     for name, fn in (("上市", _ex_twse), ("上櫃", _ex_tpex)):
         try:
@@ -599,7 +623,8 @@ def calendar(full=True):
         old = {}
     d, errs = {}, {}
     try:
-        d["exdiv"], w = exdiv()
+        rows, w = exdiv()
+        d["exdiv"] = exdiv_enrich(rows, old.get("exdiv"), full)
         if w:
             errs["exdiv"] = w   # 部分來源失敗（例如上櫃）
     except Exception as e:
