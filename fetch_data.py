@@ -1,4 +1,5 @@
-"""用法：python fetch_data.py history | live | daily | universe | session <TW|US>
+"""用法：python fetch_data.py history | live | daily | universe | markets | session <TW|US>
+  markets ：匯率、加密貨幣、全球指數／商品／利率、臺銀牌告、恐懼貪婪指數 → markets.json（由 markets-data.yml 約每 10 分鐘執行）
   session ：盤中常駐模式（取代 Cloud Run）。一次 workflow 跑完整個盤：每 LIVE_INTERVAL 秒（預設 60）抓一次即時價量，
             每次直接推到 data 分支的 live.json；休市、假日或快到 6 小時上限時自動結束（必要時由 workflow 接力重啟）
   live    ：只更新即時價量（GitHub Actions 排程約每 5 分鐘；實際可能受 GitHub 排程延遲影響）
@@ -6,7 +7,7 @@
   daily   ：K 線 + 股利/公司資訊 + 新聞 + 全市場名單（收盤後每日）
   universe：只更新全市場名單與當日行情（台股上市/上櫃/興櫃/ETF、美股 S&P500+Nasdaq100+ETF）
 股票清單直接從 stock.html 的 RAW 區塊讀取；輸出資料夾由環境變數 OUT_DIR 指定（預設 data）。"""
-import datetime as dt, email.utils, io, json, os, re, sys, time
+import csv, datetime as dt, email.utils, io, json, os, re, sys, time
 import shutil, subprocess, tempfile
 import urllib.parse, urllib.request, xml.etree.ElementTree as ET
 from zoneinfo import ZoneInfo
@@ -329,6 +330,74 @@ def daily():
             print(step.__name__, "失敗：", e)
 
 
+
+# ───────────── 金融行情：匯率 / 加密貨幣 / 全球指數・商品・利率（markets.json） ─────────────
+MK = {  # 分組 → [(Yahoo 代號, 顯示名稱, 子分類)]
+    "FX": [("USDTWD=X", "美元/台幣", "台幣"), ("JPYTWD=X", "日圓/台幣", "台幣"), ("EURTWD=X", "歐元/台幣", "台幣"),
+           ("CNYTWD=X", "人民幣/台幣", "台幣"), ("GBPTWD=X", "英鎊/台幣", "台幣"), ("AUDTWD=X", "澳幣/台幣", "台幣"),
+           ("HKDTWD=X", "港幣/台幣", "台幣"), ("KRWTWD=X", "韓元/台幣", "台幣"),
+           ("EURUSD=X", "歐元/美元", "國際"), ("GBPUSD=X", "英鎊/美元", "國際"), ("USDJPY=X", "美元/日圓", "國際"),
+           ("USDCNY=X", "美元/人民幣", "國際"), ("AUDUSD=X", "澳幣/美元", "國際"), ("DX-Y.NYB", "美元指數 DXY", "國際")],
+    "CR": [(f"{c}-USD", n, "加密貨幣") for c, n in (("BTC", "Bitcoin"), ("ETH", "Ethereum"), ("BNB", "BNB"), ("SOL", "Solana"),
+           ("XRP", "XRP"), ("DOGE", "Dogecoin"), ("ADA", "Cardano"), ("TRX", "TRON"), ("AVAX", "Avalanche"),
+           ("LINK", "Chainlink"), ("DOT", "Polkadot"), ("LTC", "Litecoin"))],
+    "GL": [("^TWII", "台灣加權指數", "股市指數"), ("^TWOII", "櫃買指數", "股市指數"), ("^GSPC", "S&P 500", "股市指數"),
+           ("^IXIC", "那斯達克", "股市指數"), ("^DJI", "道瓊工業", "股市指數"), ("^SOX", "費城半導體", "股市指數"),
+           ("^N225", "日經 225", "股市指數"), ("^HSI", "恆生指數", "股市指數"), ("^KS11", "韓國 KOSPI", "股市指數"),
+           ("^GDAXI", "德國 DAX", "股市指數"), ("^FTSE", "英國富時 100", "股市指數"), ("^VIX", "VIX 恐慌指數", "股市指數"),
+           ("GC=F", "黃金", "商品"), ("SI=F", "白銀", "商品"), ("CL=F", "WTI 原油", "商品"), ("BZ=F", "布蘭特原油", "商品"),
+           ("HG=F", "銅", "商品"), ("NG=F", "天然氣", "商品"),
+           ("^IRX", "美國 3 個月公債", "利率"), ("^FVX", "美國 5 年公債", "利率"), ("^TNX", "美國 10 年公債", "利率"), ("^TYX", "美國 30 年公債", "利率")],
+}
+rr = lambda x: round(float(x), 6 if abs(x) < 1 else 4 if abs(x) < 100 else 2)
+
+def cg_top():  # CoinGecko 免金鑰公開 API：市值排名、1h/24h/7d、全球市值與 BTC 占比
+    d = jget("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=1h,24h,7d")
+    g = jget("https://api.coingecko.com/api/v3/global")["data"]
+    return {"coins": {x["symbol"].upper(): [x.get("market_cap_rank"), x.get("market_cap"), x.get("total_volume"),
+            x.get("price_change_percentage_1h_in_currency"), x.get("price_change_percentage_24h_in_currency"),
+            x.get("price_change_percentage_7d_in_currency")] for x in d},
+            "mcap": g["total_market_cap"]["usd"], "chg": g["market_cap_change_percentage_24h_usd"], "btcd": g["market_cap_percentage"]["btc"]}
+
+def fng():  # 加密貨幣恐懼與貪婪指數（alternative.me），近 30 天
+    return [[int(i["value"]), i["value_classification"]] for i in jget("https://api.alternative.me/fng/?limit=30")["data"]]
+
+def bot_rates():  # 臺灣銀行牌告匯率 CSV：[幣別, 現金買入, 即期買入, 現金賣出, 即期賣出]
+    raw = urllib.request.urlopen(urllib.request.Request("https://rate.bot.com.tw/xrt/flcsv/0/day", headers=UA), timeout=60).read().decode("utf-8-sig", "replace")
+    out = []
+    for row in csv.reader(io.StringIO(raw)):
+        if len(row) > 13 and re.fullmatch(r"[A-Z]{3}", row[0].strip()):
+            out.append([row[0].strip()] + [num(row[i]) or None for i in (2, 3, 12, 13)])
+    return out
+
+def markets():
+    items = [(g, y, n, sub) for g, L in MK.items() for y, n, sub in L]
+    got = download([y for _, y, _, _ in items], "6mo")
+    rows = []
+    for g, y, n, sub in items:
+        d = got.get(y)
+        if d is None or len(d) < 2:
+            continue
+        x, p = d.iloc[-1], d.iloc[-2]
+        rows.append([y, n, g, sub, rr(x.Close), rr(p.Close),
+                     [[i.strftime("%m-%d"), rr(a.Open), rr(a.High), rr(a.Low), rr(a.Close), 0] for i, a in d.tail(90).iterrows()]])
+    print(f"金融行情：{len(rows)}/{len(items)} 項")
+    if not rows:
+        sys.exit("金融行情全部失敗，不更新檔案")
+    try:
+        old = json.load(open(f"{OUT}/markets.json", encoding="utf-8"))["data"]
+    except Exception:
+        old = {}
+    ex = {}
+    for k, fn in (("cg", cg_top), ("fng", fng), ("bot", bot_rates)):  # 其中一項失敗就沿用上次的
+        try:
+            ex[k] = fn()
+        except Exception as e:
+            print(k, "失敗：", e); ex[k] = old.get(k)
+    write("markets.json", {"items": rows, **ex}, merge=False)
+    if os.environ.get("GITHUB_REPOSITORY") or os.environ.get("PUB_REMOTE"):
+        publish("markets.json")
+
 # ───────────── session 模式：盤中常駐（取代 Cloud Run 的 /prefetch 與 /quote） ─────────────
 # 時區, 開始（含開盤前 5 分）, 結束（含收盤後 5 分）, 正式開盤（分鐘，當地時間）
 MKT = {"TW": ("Asia/Taipei", 535, 815, 540), "US": ("America/New_York", 565, 965, 570)}
@@ -349,7 +418,7 @@ def _git(d, *a, check=True):
         raise RuntimeError(f"git {a[0]} 失敗：{p.stderr.strip()[:200]}".replace(tok, "***"))
     return p
 
-def publish():
+def publish(name="live.json"):
     """把 OUT/live.json 推到 data 分支（只換這一個檔，分支維持 1 個 commit）。
     每次先抓最新的 data 分支再換檔，並用 --force-with-lease：如果同時有 daily/universe 更新了其他檔案，不會被蓋掉。"""
     d = PUB.get("dir")
@@ -367,7 +436,7 @@ def publish():
             _git(d, "checkout", "-q", "-f", "-B", "data", "FETCH_HEAD")
         else:  # data 分支還不存在：第一次發佈，整個輸出資料夾一起放上去
             shutil.copytree(OUT, d, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".git"))
-        shutil.copyfile(f"{OUT}/live.json", f"{d}/live.json")
+        shutil.copyfile(f"{OUT}/{name}", f"{d}/{name}")
         _git(d, "add", "-A")
         if base and _git(d, "diff", "--cached", "--quiet", check=False).returncode == 0:
             return
@@ -421,4 +490,4 @@ if __name__ == "__main__":
     mode = sys.argv[1]
     if mode == "session":
         sys.exit(session(sys.argv[2] if len(sys.argv) > 2 else "TW"))
-    {"history": lambda: save_history(fetch("8mo")), "live": live, "daily": daily, "universe": universe}[mode]()
+    {"history": lambda: save_history(fetch("8mo")), "markets": markets, "live": live, "daily": daily, "universe": universe}[mode]()

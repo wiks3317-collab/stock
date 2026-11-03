@@ -5,7 +5,7 @@
 <meta name="googlebot" content="noindex, nofollow">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E📈%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<title>股票資訊儀表板</title>
+<title>金融資訊儀表板</title>
 <style>
 /* ───────── 設計代幣（主題變數；7 組主題名稱與 index.html 共用，請勿改名） ───────── */
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light;
@@ -23,7 +23,9 @@ html[data-theme=dracula]{color-scheme:dark;--bg:#1e1f29;--card:#282a36;--tx:#f8f
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 var(--font);-webkit-font-smoothing:antialiased;transition:background-color .15s,color .15s}
-button,input{font:inherit;color:var(--tx)}
+button,input,select{font:inherit;color:var(--tx)}
+select{border:1px solid var(--bd);background:var(--bg);border-radius:8px;padding:7px 12px}
+.mu{color:var(--mu)}
 button{cursor:pointer}
 a{color:var(--ac)}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
@@ -130,8 +132,9 @@ canvas{display:block;width:100%;height:340px}
  .bar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px}
  h1{margin:0;font-size:17px}
  .theme-box{grid-column:2;grid-row:1;gap:6px}
- .seg{grid-column:1;grid-row:2}
- input{grid-column:2;grid-row:2;max-width:none;font-size:16px}
+ .seg{grid-column:1/-1;grid-row:2;overflow-x:auto}
+ .seg .chip{padding:5px 11px}
+ input{grid-column:1/-1;grid-row:3;max-width:none;font-size:16px}
  .sec h2{padding:16px 16px 10px}
  th:first-child,td:first-child{padding-left:16px}
  th:last-child,td:last-child{padding-right:16px}
@@ -151,8 +154,8 @@ canvas{display:block;width:100%;height:340px}
 <header>
  <div class="wrap">
   <div class="bar">
-   <h1>股票資訊</h1>
-   <div class="seg" role="group" aria-label="市場"><button class="chip on" id="mTW">台股</button><button class="chip" id="mUS">美股</button></div>
+   <h1>金融資訊</h1>
+   <div class="seg" role="group" aria-label="市場"><button class="chip on" id="mTW">台股</button><button class="chip" id="mUS">美股</button><button class="chip" id="mFX">匯率</button><button class="chip" id="mCR">加密貨幣</button><button class="chip" id="mGL">全球市場</button></div>
    <input id="q" type="search" placeholder="搜尋代號或名稱" aria-label="搜尋代號或名稱">
    <div class="theme-box" aria-label="網頁顏色主題"><button class="theme-sw" data-theme-choice="system" data-t="system" title="跟隨系統" aria-label="跟隨系統"></button><button class="theme-sw" data-theme-choice="light" data-t="light" title="亮色" aria-label="亮色"></button><button class="theme-sw" data-theme-choice="dark" data-t="dark" title="暗色" aria-label="暗色"></button><button class="theme-sw" data-theme-choice="sepia" data-t="sepia" title="復古暖色" aria-label="復古暖色"></button><button class="theme-sw" data-theme-choice="forest" data-t="forest" title="森林綠" aria-label="森林綠"></button><button class="theme-sw" data-theme-choice="ocean" data-t="ocean" title="海洋藍" aria-label="海洋藍"></button><button class="theme-sw" data-theme-choice="dracula" data-t="dracula" title="Dracula" aria-label="Dracula"></button></div>
   </div>
@@ -202,13 +205,13 @@ function ind_(s){if(s.snap){const k=s.k;s.p=k[1].c;s.pv=k[0].c;s.chg=s.pv?(s.p/s
  s.tags=[];if(s.vr>1.5)s.tags.push('爆量');if(s.chg>3)s.tags.push('強漲');if(s.chg<-3)s.tags.push('急跌');if(s.bull)s.tags.push('多頭排列');if(s.rsi>70)s.tags.push('RSI過熱');if(s.rsi<30)s.tags.push('RSI超賣')}
 const all=()=>Object.values(S);
 function recalc(){all().forEach(ind_)}recalc();
-const cls=(s,v)=>(s.m=='TW'?v>=0:v<0)?'up':'dn';
-const col=(m,up)=>getComputedStyle(document.documentElement).getPropertyValue((m=='TW')==up?'--up':'--dn').trim();
+const cls=(s,v)=>(s.m!='US'?v>=0:v<0)?'up':'dn'; // 台股、匯率、加密貨幣、全球市場：紅漲綠跌；美股：綠漲紅跌
+const col=(m,up)=>getComputedStyle(document.documentElement).getPropertyValue((m!='US')==up?'--up':'--dn').trim();
 const f2=n=>n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fv=s=>{const v=s.k[s.k.length-1].v;return s.m=='TW'?Math.round(v).toLocaleString()+' 張':(v/1e6).toFixed(1)+'M 股'};
 function row(s,i){VIS.push(s.m+s.code);const st=fav.includes(s.m+s.code);return `<tr class="r${PROXY_URL&&!GOT.has(s.m+s.code)?' stale':''}" data-k="${s.m+s.code}"><td><span class="star ${st?'on':''}" data-f="${s.m+s.code}">${st?'★':'☆'}</span>${i?`<span class="rk">${i}</span>`:''}<span class="cd">${s.code}</span>${s.name}${s.tags.slice(0,2).map(t=>`<span class="tag">${t}</span>`).join('')}</td><td class="${cls(s,s.chg)}">${f2(s.p)}</td><td class="${cls(s,s.chg)}">${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</td><td>${fv(s)}</td><td>${Math.round(s.score)}</td></tr>`}
 const th='<div class="tw"><table><tr><th>股票</th><th>現價</th><th>漲跌幅</th><th>成交量</th><th>熱度</th></tr>';
-function render(){VIS=[];const m=$('main'),T=TREE[mkt];
+function render(){if(FIN[mkt])return renderFin();SIG='';VIS=[];const m=$('main'),T=TREE[mkt];
  $('inds').innerHTML=['🔥 全市場熱門','⭐ 自選',...Object.keys(T)].map(x=>`<button class="chip ${x==ind?'on':''}" data-i="${x}">${x.replace(/^[^\p{L}\p{N}]+/u,'')}</button>`).join('');
  let h='';
  if(q){const r=all().filter(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase())).slice(0,50);h=`<div class="sec"><h2>搜尋結果（${r.length}） <small style="color:var(--mu)">熱門/分類名單外亦會透過 Yahoo Finance 搜尋</small></h2>${th}${r.map(s=>row(s)).join('')}</table></div></div>`}
@@ -237,10 +240,10 @@ function detail(key,range=90,tab=0){const s=S[key];if(!s)return;if(s.snap)return
 let cur=null;
 function draw(s,range){const cv=$('cv'),dp=devicePixelRatio||1,W=cv.clientWidth,H=340;cv.width=W*dp;cv.height=H*dp;const c=cv.getContext('2d');c.scale(dp,dp);
  const k=s.k,N=k.length,st=N-range,D=k.slice(st),PH=250,pr=46,bw=(W-pr)/D.length;
- const hi=Math.max(...D.map(x=>x.h)),lo=Math.min(...D.map(x=>x.l)),mv=Math.max(...D.map(x=>x.v));
+ const hi=Math.max(...D.map(x=>x.h)),lo=Math.min(...D.map(x=>x.l)),mv=Math.max(1,...D.map(x=>x.v));
  const Y=v=>10+(hi-v)/(hi-lo||1)*(PH-20),X=i=>i*bw+bw/2;
  const css=getComputedStyle(document.documentElement);c.strokeStyle=css.getPropertyValue('--bd');c.fillStyle=css.getPropertyValue('--mu');c.font='11px sans-serif';c.textAlign='left';
- for(let i=0;i<5;i++){const v=lo+(hi-lo)*i/4,y=Y(v);c.beginPath();c.moveTo(0,y);c.lineTo(W-pr,y);c.stroke();c.fillText(v.toFixed(1),W-pr+4,y+4)}
+ for(let i=0;i<5;i++){const v=lo+(hi-lo)*i/4,y=Y(v);c.beginPath();c.moveTo(0,y);c.lineTo(W-pr,y);c.stroke();c.fillText(fa(v),W-pr+4,y+4)}
  D.forEach((x,i)=>{const u=x.c>=x.o,cl=col(s.m,u);c.strokeStyle=c.fillStyle=cl;c.beginPath();c.moveTo(X(i),Y(x.h));c.lineTo(X(i),Y(x.l));c.stroke();
   const y1=Y(Math.max(x.o,x.c)),hh=Math.max(1,Math.abs(Y(x.o)-Y(x.c)));c.fillRect(X(i)-bw*.35,y1,bw*.7,hh);
   const vh=x.v/mv*60;c.globalAlpha=.55;c.fillRect(X(i)-bw*.35,H-vh-14,bw*.7,vh);c.globalAlpha=1;
@@ -261,10 +264,10 @@ document.querySelectorAll('.theme-sw').forEach(b=>b.addEventListener('click',()=
 document.addEventListener('click',e=>{const t=e.target;
  if(t.dataset.f){const k=t.dataset.f;fav=fav.includes(k)?fav.filter(x=>x!=k):[...fav,k];try{localStorage.setItem('fav',JSON.stringify(fav))}catch(x){}render();e.stopPropagation();return}
  if(t.dataset.i){ind=t.dataset.i;q='';$('q').value='';render();return}
- const tr=t.closest&&t.closest('tr.r');if(tr&&!$('ov').contains(t))detail(tr.dataset.k)});
+ const tr=t.closest&&t.closest('tr.r');if(tr&&!$('ov').contains(t))(M[tr.dataset.k]?finDetail:detail)(tr.dataset.k)});
 $('ov').addEventListener('click',e=>{if(e.target.id=='ov')$('ov').style.display='none'});
-function setM(m){mkt=m;ind='🔥 全市場熱門';$('mTW').classList.toggle('on',m=='TW');$('mUS').classList.toggle('on',m=='US');render()}
-$('mTW').onclick=()=>setM('TW');$('mUS').onclick=()=>setM('US');
+function setM(m){mkt=m;ind=FIN[m]?FIN[m][0]:'🔥 全市場熱門';q='';$('q').value='';['TW','US','FX','CR','GL'].forEach(x=>$('m'+x).classList.toggle('on',x==m));if(FIN[m]&&!MD)loadMarkets();render()}
+['TW','US','FX','CR','GL'].forEach(x=>$('m'+x).onclick=()=>setM(x));
 $('q').oninput=e=>{
  q=e.target.value.trim();render();
  clearTimeout(searchTimer);
@@ -419,5 +422,54 @@ async function proxyQuotes(force){if(BUSY)return true;let ks=[...new Set([...(cu
  catch(e){console.warn('proxy quote',e);FAILT=Date.now();stamp('⚠️ 即時報價連線失敗，改用排程資料',null,1);return false}
  finally{BUSY=false}
  return true}
-ind='🔥 全市場熱門';render();Promise.allSettled([loadHistory(),loadUniverse()]).then(async()=>{LOADED=true;await loadQuotes();recalc();render();if(PROXY_URL)proxyQuotes(true).then(()=>{recalc();render()})});
+// ───────── 金融行情：匯率 / 加密貨幣 / 全球市場（資料來自 data 分支的 markets.json） ─────────
+const FIN={FX:['台幣匯率','國際匯率','臺銀牌告','換算器'],CR:['加密貨幣'],GL:['股市指數','商品','利率']};
+const M={};let MD=null,MU='',SIG='';
+const BN={USD:'美金',JPY:'日圓',EUR:'歐元',CNY:'人民幣',HKD:'港幣',GBP:'英鎊',AUD:'澳幣',KRW:'韓元',SGD:'新加坡幣',THB:'泰銖',CAD:'加幣',NZD:'紐幣',CHF:'瑞士法郎',VND:'越南盾',MYR:'馬來幣',PHP:'菲律賓披索',IDR:'印尼盾',SEK:'瑞典幣',ZAR:'南非幣'};
+const FG={'Extreme Fear':'極度恐慌','Fear':'恐慌','Neutral':'中立','Greed':'貪婪','Extreme Greed':'極度貪婪'};
+const fp=v=>v==null?'—':Math.abs(v)>=1000?v.toLocaleString('en',{maximumFractionDigits:2}):Math.abs(v)>=100?v.toFixed(2):Math.abs(v)>=1?v.toFixed(3):v.toFixed(4);
+const fa=v=>Math.abs(v)>=1000?Math.round(v).toLocaleString('en'):fp(v);
+const pc=v=>v==null?'<span class="mu">—</span>':`<span class="${v>=0?'up':'dn'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
+const big=v=>v==null?'—':v>=1e12?(v/1e12).toFixed(2)+' 兆':v>=1e9?(v/1e9).toFixed(1)+' B':(v/1e6).toFixed(0)+' M';
+const chgTxt=s=>s.sub=='利率'?(s.chg>=0?'+':'')+s.chg.toFixed(3)+' pt':(s.chg>=0?'▲ ':'▼ ')+Math.abs(s.chg).toFixed(2)+'%';
+function spark(s,n=30){const a=s.k.slice(-n).map(x=>x.c);if(a.length<2)return'';const lo=Math.min(...a),hi=Math.max(...a),w=84,h=24;
+ return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="${cls(s,a[a.length-1]-a[0])}" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="${a.map((v,i)=>(i/(a.length-1)*w).toFixed(1)+','+(h-2-(v-lo)/(hi-lo||1)*(h-4)).toFixed(1)).join(' ')}"/></svg>`}
+function frow(s,mid=''){return `<tr class="r" data-k="${esc(s.code)}"><td><b>${esc(s.name)}</b><span class="tag">${esc(s.code.replace(/=X|=F|\^/g,''))}</span></td><td>${fp(s.p)}</td><td class="${cls(s,s.chg)}">${chgTxt(s)}</td>${mid}<td>${spark(s)}</td></tr>`}
+const sec=(t,n,h)=>`<div class="sec"><h2>${t}<small>${n||''}</small></h2>${h}</div>`;
+const tbl=(heads,rows)=>`<div class="tw"><table><tr>${heads.map((x,i)=>`<th${i==0?'':''}>${x}</th>`).join('')}</tr>${rows}</table></div>`;
+const CUR=['TWD','USD','JPY','EUR','CNY','GBP','AUD','HKD','KRW'];
+const twd=c=>c=='TWD'?1:(M[c+'TWD=X']||{}).p||null;
+function cvtCalc(){const a=+$('ca').value,f=twd($('cf').value),t=twd($('ct').value);$('cr').innerHTML=f&&t&&isFinite(a)?`${a.toLocaleString()} ${$('cf').value} ≈ <b>${(a*f/t).toLocaleString('en',{maximumFractionDigits:4})} ${$('ct').value}</b>`:'—'}
+function renderFin(){VIS=[];const tabs=FIN[mkt];if(!tabs.includes(ind))ind=tabs[0];
+ const sig=mkt+ind+q+MU;if(sig==SIG&&$('main').firstChild)return;SIG=sig;
+ $('inds').innerHTML=tabs.map(x=>`<button class="chip ${x==ind?'on':''}" data-i="${x}">${x}</button>`).join('');
+ const m=$('main');if(!MD){m.innerHTML='<p class="empty">金融行情載入中…（markets.json 由 GitHub Actions 約每 10 分鐘更新）</p>';return}
+ $('stamp').textContent='Yahoo Finance／CoinGecko／臺灣銀行・最新抓取 '+MU;
+ const hit=s=>!q||(s.code+s.name).toLowerCase().includes(q.toLowerCase()),L=sub=>Object.values(M).filter(s=>s.sub==sub&&hit(s));
+ const H=['名稱','現價','漲跌幅','30日走勢'];let h='';
+ if(ind=='台幣匯率'||ind=='國際匯率'){const sub=ind=='台幣匯率'?'台幣':'國際';h=sec(ind,sub=='台幣'?'1 外幣可換多少台幣（中間價，非銀行牌告）':'國際主要貨幣對與美元指數',tbl(H,L(sub).map(s=>frow(s)).join('')))}
+ else if(ind=='臺銀牌告'){const b=(MD.bot||[]).filter(x=>!q||(x[0]+(BN[x[0]]||'')).toLowerCase().includes(q.toLowerCase()));
+  h=sec('臺灣銀行牌告匯率','「買入」＝你賣外幣給銀行；「賣出」＝你向銀行買外幣；單位：台幣',b.length?tbl(['幣別','現金買入','即期買入','現金賣出','即期賣出'],b.map(x=>`<tr><td><b>${BN[x[0]]||x[0]}</b><span class="tag">${x[0]}</span></td>${x.slice(1).map(v=>`<td>${v==null?'—':fp(v)}</td>`).join('')}</tr>`).join('')):'<p class="empty">臺銀牌告暫時抓不到，稍後再試。</p>')}
+ else if(ind=='換算器'){h=sec('匯率換算','依 Yahoo Finance 中間價換算，不含銀行手續費與買賣價差',`<div class="row" id="cvt" style="padding:0 20px 8px"><input id="ca" type="number" inputmode="decimal" value="1000" aria-label="金額"><select id="cf" aria-label="從">${CUR.map(c=>`<option ${c=='USD'?'selected':''}>${c}</option>`).join('')}</select><span class="mu">換成</span><select id="ct" aria-label="到">${CUR.map(c=>`<option ${c=='TWD'?'selected':''}>${c}</option>`).join('')}</select></div><div class="px" id="cr" style="padding:0 20px;margin-bottom:24px"></div>`);m.innerHTML=h;['ca','cf','ct'].forEach(i=>$(i).oninput=$(i).onchange=cvtCalc);cvtCalc();return}
+ else if(mkt=='CR'){const cg=MD.cg||{},C=cg.coins||{},f=(MD.fng||[])[0],u=twd('USD');
+  const kv=[cg.mcap?`<div><b>全球加密市值</b>${big(cg.mcap)} USD</div><div><b>市值 24h 變動</b>${pc(cg.chg)}</div><div><b>BTC 市占</b>${cg.btcd.toFixed(1)}%</div>`:'',f?`<div><b>恐懼與貪婪指數</b>${f[0]} ${FG[f[1]]||f[1]}</div>`:''].join('');
+  const rows=L('加密貨幣').sort((a,b)=>((C[a.code.split('-')[0]]||[999])[0])-((C[b.code.split('-')[0]]||[999])[0])).map(s=>{const c=C[s.code.split('-')[0]]||[];
+   return `<tr class="r" data-k="${esc(s.code)}"><td><span class="rk">${c[0]||''}</span><b>${esc(s.name)}</b><span class="tag">${s.code.split('-')[0]}</span></td><td>${fp(s.p)}${u?`<br><small class="mu">NT$ ${(s.p*u).toLocaleString('en',{maximumFractionDigits:s.p*u<10?3:0})}</small>`:''}</td><td>${pc(c[4]!=null?c[4]:s.chg)}</td><td>${pc(c[5])}</td><td>${big(c[1])}</td><td>${spark(s)}</td></tr>`}).join('');
+  h=(kv?`<div class="sec" style="padding:4px 20px 12px"><div class="kv">${kv}</div></div>`:'')+sec('加密貨幣','美元計價・24 小時交易；漲跌幅為 24 小時',tbl(['幣種','價格（USD）','24h','7日','市值','30日走勢'],rows))}
+ else{h=sec(ind,ind=='利率'?'殖利率（%），漲跌為百分點':'',tbl(H,L(ind).map(s=>frow(s)).join('')))}
+ m.innerHTML=h||'<p class="empty">沒有符合的項目</p>'}
+function finDetail(key,range=90){const s=M[key];if(!s)return;range=Math.min(range,s.k.length);const R=s.k.slice(-range),hi=Math.max(...R.map(x=>x.h)),lo=Math.min(...R.map(x=>x.l));
+ $('md').innerHTML=`<div class="mh"><div><b class="mt">${esc(s.name)}</b><br><span class="tag nm">${esc(s.code)} ・ ${esc(s.sub)}</span></div><button class="chip" id="cl">✕ 關閉</button></div>
+ <div class="px ${cls(s,s.chg)}">${fp(s.p)} <small>${chgTxt(s)}</small></div>
+ <div class="row rg">${[30,60,90].map(n=>`<button class="chip ${n==range?'on':''}" data-r="${n}">${n}日</button>`).join('')}<small class="mu"><span style="color:#c8963e">━</span> 5日 <span style="color:#5b86a8">━</span> 20日 <span style="color:#8f7aa8">━</span> 60日</small></div><canvas id="cv"></canvas>
+ <div class="kv"><div><b>前一日收盤</b>${fp(s.pv)}</div><div><b>${range}日最高</b>${fp(hi)}</div><div><b>${range}日最低</b>${fp(lo)}</div></div>
+ <p class="mu" style="font-size:12px">資料：Yahoo Finance，由 GitHub Actions 約每 10 分鐘更新（可能有延遲）。加密貨幣以 UTC 日界線計算日 K。</p>`;
+ $('ov').style.display='block';draw(s,range);cur=null;
+ $('md').onclick=e=>{const t=e.target;if(t.id=='cl')$('ov').style.display='none';else if(t.dataset.r)finDetail(key,+t.dataset.r)}}
+async function loadMarkets(){try{const d=await getJSON('markets.json',6e4);MD=d.data;MU=d.updated;
+  for(const x of MD.items){const[p,pv]=[x[4],x[5]];M[x[0]]={m:x[2],code:x[0],name:x[1],sub:x[3],p,pv,chg:x[3]=='利率'?p-pv:pv?(p/pv-1)*100:0,k:x[6].map(a=>({t:a[0],o:a[1],h:a[2],l:a[3],c:a[4],v:0}))}}
+  if(FIN[mkt]){if(ind=='換算器'&&$('cvt')){SIG=mkt+ind+q+MU;cvtCalc()}else render()}}
+ catch(e){console.warn('markets.json 載入失敗',e);if(FIN[mkt]&&!MD)$('main').innerHTML='<p class="empty">金融行情暫時無法載入：markets-data 工作流程可能還沒執行過，請到 GitHub Actions 手動執行一次。</p>'}}
+setInterval(()=>{if(!document.hidden&&liveOn&&FIN[mkt])loadMarkets()},6e4);
+ind='🔥 全市場熱門';render();loadMarkets();Promise.allSettled([loadHistory(),loadUniverse()]).then(async()=>{LOADED=true;await loadQuotes();recalc();render();if(PROXY_URL)proxyQuotes(true).then(()=>{recalc();render()})});
 </script></body></html>
