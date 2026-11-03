@@ -371,10 +371,9 @@ def _get(url, tries=3):
             last = e; time.sleep(2 * (i + 1))
     raise last
 
-def bot_csv():
-    txt = _get("https://rate.bot.com.tw/xrt/flcsv/0/day").decode("utf-8-sig", "replace")
+def _bot_csv(txt):
     rows = list(csv.reader(io.StringIO(txt)))
-    hdr = next((r for r in rows if "現金" in [x.strip() for x in r]), [])
+    hdr = next((r_ for r_ in rows if "現金" in [x.strip() for x in r_]), [])
     ci = [i for i, x in enumerate(hdr) if x.strip() == "現金"]
     idx = (ci[0], ci[0] + 1, ci[1], ci[1] + 1) if len(ci) >= 2 else (2, 3, 12, 13)   # 買入現金、買入即期、賣出現金、賣出即期
     out = []
@@ -383,11 +382,10 @@ def bot_csv():
         if c and len(r_) > idx[3]:
             out.append([c[1]] + [num(r_[i]) or None for i in idx])
     if not out:
-        raise RuntimeError("CSV 格式不符：" + txt[:80].replace("\n", " "))
+        raise ValueError("CSV 沒有幣別資料")
     return out
 
-def bot_html():  # CSV 失敗時的備援：解析牌告網頁表格（欄位以 data-table 屬性辨識）
-    html = _get("https://rate.bot.com.tw/xrt?Lang=zh-TW").decode("utf-8", "replace")
+def _bot_html(html):  # 牌告網頁表格（欄位以 data-table 屬性辨識）
     out = []
     for tr in re.findall(r"<tr>.*?</tr>", html, re.S):
         c = re.search(r"\(([A-Z]{3})\)", tr)
@@ -395,17 +393,38 @@ def bot_html():  # CSV 失敗時的備援：解析牌告網頁表格（欄位以
         if c and all(v):
             out.append([c[1]] + [num(x[1]) or None for x in v])
     if not out:
-        raise RuntimeError("網頁表格解析不到資料")
+        raise ValueError("網頁表格沒有幣別資料")
     return out
 
-def bot_rates():  # 臺灣銀行牌告匯率：[幣別, 現金買入, 即期買入, 現金賣出, 即期賣出]；先 CSV，失敗改解析網頁
-    try:
-        return bot_csv()
-    except Exception as e1:
-        try:
-            return bot_html()
-        except Exception as e2:
-            raise RuntimeError(f"CSV：{str(e1)[:70]}；網頁：{str(e2)[:70]}")
+def _peek(body):  # 回應不是預期內容時，抓出標題或開頭文字，方便判斷是不是被擋
+    t = body.decode("utf-8", "replace")
+    m = re.search(r"<title[^>]*>(.*?)</title>", t, re.S | re.I)
+    return (m[1] if m else re.sub(r"<[^>]+>", " ", t))[:50].strip().replace("\n", " ")
+
+BOT_TRY = [("https://rate.bot.com.tw/xrt/flcsv/0/day", _bot_csv), ("http://rate.bot.com.tw/xrt/flcsv/0/day", _bot_csv),
+           ("https://rate.bot.com.tw/xrt?Lang=zh-TW", _bot_html)]
+BOT_UA = [BH["User-Agent"], "curl/8.5.0"]
+
+def bot_rates():
+    """臺灣銀行牌告匯率：[幣別, 現金買入, 即期買入, 現金賣出, 即期賣出]。依序嘗試 https／http CSV、牌告網頁，各用兩種 User-Agent；
+    全部失敗時，錯誤訊息會附上 HTTP 狀態與回應標題（判斷是不是被擋）。"""
+    diag = []
+    for url, parse in BOT_TRY:
+        for ua in BOT_UA:
+            try:
+                req = urllib.request.Request(url, headers={**BH, "User-Agent": ua, "Referer": "https://rate.bot.com.tw/xrt"})
+                try:
+                    r_ = urllib.request.urlopen(req, timeout=20); st, body = r_.status, r_.read()
+                except urllib.error.HTTPError as e:
+                    st, body = e.code, e.read()
+                try:
+                    return parse(body.decode("utf-8-sig", "replace"))
+                except Exception:
+                    diag.append(f"{url.split(':')[0]} {'CSV' if parse is _bot_csv else '網頁'} HTTP {st} 「{_peek(body)}」")
+            except Exception as e:
+                diag.append(f"{url.split(':')[0]} {'CSV' if parse is _bot_csv else '網頁'} {type(e).__name__}:{str(e)[:40]}")
+            time.sleep(1)
+    raise RuntimeError("；".join(dict.fromkeys(diag))[:300])
 
 FXC = [("USD", "美元", "主要貨幣"), ("EUR", "歐元", "主要貨幣"), ("GBP", "英鎊", "主要貨幣"), ("AUD", "澳幣", "主要貨幣"),
        ("CAD", "加幣", "主要貨幣"), ("NZD", "紐幣", "主要貨幣"), ("CHF", "瑞士法郎", "主要貨幣"),
@@ -461,14 +480,19 @@ def markets():
         old = json.load(open(f"{OUT}/markets.json", encoding="utf-8"))["data"]
     except Exception:
         old = {}
-    ex = {"boterr": None}
+    ex = {"boterr": None, "botat": old.get("botat")}
     for k, fn in (("cg", cg_top), ("fng", fng), ("bot", bot_rates)):  # 其中一項失敗就沿用上次的
+        if k == "bot" and old.get("boterr") and old.get("botat") and \
+                (dt.datetime.now(TZ) - dt.datetime.strptime(old["botat"], "%Y-%m-%d %H:%M").replace(tzinfo=TZ)).total_seconds() < 1800:
+            ex["bot"], ex["boterr"] = old.get("bot"), old["boterr"]; continue   # 上次失敗不到 30 分鐘：先不重試
         try:
             ex[k] = fn()
+            if k == "bot":
+                ex["botat"] = dt.datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
         except Exception as e:
             print(k, "失敗：", e); ex[k] = old.get(k)
             if k == "bot":
-                ex["boterr"] = str(e)[:160]
+                ex["boterr"] = str(e)[:300]; ex["botat"] = dt.datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     write("markets.json", {"items": rows, **ex}, merge=False)
     pubs = ["markets.json"]
     if _age_min("calendar.json") > 50:   # 經濟日曆約每小時更新一次（來源有流量限制，不要太頻繁）
