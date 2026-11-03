@@ -1,4 +1,5 @@
-"""用法：python fetch_data.py history | live | daily | universe | markets | session <TW|US>
+"""用法：python fetch_data.py history | live | daily | universe | markets | chips | calendar | session <TW|US>
+  chips   ：台股上市三大法人買賣超（chips.json）；calendar：除權息預告、財報日、經濟數據日曆（calendar.json）
   markets ：匯率、加密貨幣、全球指數／商品／利率、臺銀牌告、恐懼貪婪指數 → markets.json（由 markets-data.yml 約每 10 分鐘執行）
   session ：盤中常駐模式（取代 Cloud Run）。一次 workflow 跑完整個盤：每 LIVE_INTERVAL 秒（預設 60）抓一次即時價量，
             每次直接推到 data 分支的 live.json；休市、假日或快到 6 小時上限時自動結束（必要時由 workflow 接力重啟）
@@ -323,7 +324,7 @@ def universe():
 def daily():
     res = fetch("8mo")
     save_history(res)
-    for step in (details, news, universe):  # 其中一項失敗不影響其他
+    for step in (details, news, universe, chips, calendar):  # 其中一項失敗不影響其他
         try:
             step(res) if step is details else step()
         except Exception as e:
@@ -333,11 +334,7 @@ def daily():
 
 # ───────────── 金融行情：匯率 / 加密貨幣 / 全球指數・商品・利率（markets.json） ─────────────
 MK = {  # 分組 → [(Yahoo 代號, 顯示名稱, 子分類)]
-    "FX": [("USDTWD=X", "美元/台幣", "台幣"), ("JPYTWD=X", "日圓/台幣", "台幣"), ("EURTWD=X", "歐元/台幣", "台幣"),
-           ("CNYTWD=X", "人民幣/台幣", "台幣"), ("GBPTWD=X", "英鎊/台幣", "台幣"), ("AUDTWD=X", "澳幣/台幣", "台幣"),
-           ("HKDTWD=X", "港幣/台幣", "台幣"), ("KRWTWD=X", "韓元/台幣", "台幣"),
-           ("EURUSD=X", "歐元/美元", "國際"), ("GBPUSD=X", "英鎊/美元", "國際"), ("USDJPY=X", "美元/日圓", "國際"),
-           ("USDCNY=X", "美元/人民幣", "國際"), ("AUDUSD=X", "澳幣/美元", "國際"), ("DX-Y.NYB", "美元指數 DXY", "國際")],
+    "FX": [],  # 在下面 MK["FX"] 設定
     "CR": [(f"{c}-USD", n, "加密貨幣") for c, n in (("BTC", "Bitcoin"), ("ETH", "Ethereum"), ("BNB", "BNB"), ("SOL", "Solana"),
            ("XRP", "XRP"), ("DOGE", "Dogecoin"), ("ADA", "Cardano"), ("TRX", "TRON"), ("AVAX", "Avalanche"),
            ("LINK", "Chainlink"), ("DOT", "Polkadot"), ("LTC", "Litecoin"))],
@@ -362,20 +359,96 @@ def cg_top():  # CoinGecko 免金鑰公開 API：市值排名、1h/24h/7d、全�
 def fng():  # 加密貨幣恐懼與貪婪指數（alternative.me），近 30 天
     return [[int(i["value"]), i["value_classification"]] for i in jget("https://api.alternative.me/fng/?limit=30")["data"]]
 
-def bot_rates():  # 臺灣銀行牌告匯率 CSV：[幣別, 現金買入, 即期買入, 現金賣出, 即期賣出]
-    raw = urllib.request.urlopen(urllib.request.Request("https://rate.bot.com.tw/xrt/flcsv/0/day", headers=UA), timeout=60).read().decode("utf-8-sig", "replace")
+BH = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "Accept": "text/csv,text/html,application/json,*/*", "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8"}
+
+def _get(url, tries=3):
+    last = None
+    for i in range(tries):
+        try:
+            return urllib.request.urlopen(urllib.request.Request(url, headers=BH), timeout=40).read()
+        except Exception as e:
+            last = e; time.sleep(2 * (i + 1))
+    raise last
+
+def bot_csv():
+    txt = _get("https://rate.bot.com.tw/xrt/flcsv/0/day").decode("utf-8-sig", "replace")
+    rows = list(csv.reader(io.StringIO(txt)))
+    hdr = next((r for r in rows if "現金" in [x.strip() for x in r]), [])
+    ci = [i for i, x in enumerate(hdr) if x.strip() == "現金"]
+    idx = (ci[0], ci[0] + 1, ci[1], ci[1] + 1) if len(ci) >= 2 else (2, 3, 12, 13)   # 買入現金、買入即期、賣出現金、賣出即期
     out = []
-    for row in csv.reader(io.StringIO(raw)):
-        if len(row) > 13 and re.fullmatch(r"[A-Z]{3}", row[0].strip()):
-            out.append([row[0].strip()] + [num(row[i]) or None for i in (2, 3, 12, 13)])
+    for r_ in rows:
+        c = re.match(r"\s*([A-Z]{3})\b", r_[0]) if r_ else None
+        if c and len(r_) > idx[3]:
+            out.append([c[1]] + [num(r_[i]) or None for i in idx])
+    if not out:
+        raise RuntimeError("CSV 格式不符：" + txt[:80].replace("\n", " "))
     return out
+
+def bot_html():  # CSV 失敗時的備援：解析牌告網頁表格（欄位以 data-table 屬性辨識）
+    html = _get("https://rate.bot.com.tw/xrt?Lang=zh-TW").decode("utf-8", "replace")
+    out = []
+    for tr in re.findall(r"<tr>.*?</tr>", html, re.S):
+        c = re.search(r"\(([A-Z]{3})\)", tr)
+        v = [re.search(r'data-table="本行%s"[^>]*>\s*([^<\s]+)' % k, tr) for k in ("現金買入", "即期買入", "現金賣出", "即期賣出")]
+        if c and all(v):
+            out.append([c[1]] + [num(x[1]) or None for x in v])
+    if not out:
+        raise RuntimeError("網頁表格解析不到資料")
+    return out
+
+def bot_rates():  # 臺灣銀行牌告匯率：[幣別, 現金買入, 即期買入, 現金賣出, 即期賣出]；先 CSV，失敗改解析網頁
+    try:
+        return bot_csv()
+    except Exception as e1:
+        try:
+            return bot_html()
+        except Exception as e2:
+            raise RuntimeError(f"CSV：{str(e1)[:70]}；網頁：{str(e2)[:70]}")
+
+FXC = [("USD", "美元", "主要貨幣"), ("EUR", "歐元", "主要貨幣"), ("GBP", "英鎊", "主要貨幣"), ("AUD", "澳幣", "主要貨幣"),
+       ("CAD", "加幣", "主要貨幣"), ("NZD", "紐幣", "主要貨幣"), ("CHF", "瑞士法郎", "主要貨幣"),
+       ("JPY", "日圓", "亞洲鄰近"), ("CNY", "人民幣", "亞洲鄰近"), ("HKD", "港幣", "亞洲鄰近"), ("KRW", "韓元", "亞洲鄰近"),
+       ("MOP", "澳門幣", "亞洲鄰近"), ("SGD", "新加坡幣", "亞洲鄰近"), ("THB", "泰銖", "亞洲鄰近"), ("MYR", "馬來幣", "亞洲鄰近"),
+       ("PHP", "菲律賓披索", "亞洲鄰近"), ("IDR", "印尼盾", "亞洲鄰近"), ("VND", "越南盾", "亞洲鄰近"), ("INR", "印度盧比", "亞洲鄰近")]
+USDBASE = {"JPY", "KRW", "CNY", "HKD", "MOP", "SGD", "THB", "MYR", "PHP", "IDR", "VND", "INR", "CAD", "CHF"}   # Yahoo 報價方向：USDxxx（其餘是 xxxUSD）
+MK["FX"] = [(f"{c}TWD=X", f"{n}/台幣", sub) for c, n, sub in FXC] + [
+    ("EURUSD=X", "歐元/美元", "國際"), ("GBPUSD=X", "英鎊/美元", "國際"), ("AUDUSD=X", "澳幣/美元", "國際"), ("USDJPY=X", "美元/日圓", "國際"),
+    ("EURJPY=X", "歐元/日圓", "國際"), ("USDCNY=X", "美元/人民幣", "國際"), ("USDKRW=X", "美元/韓元", "國際"), ("USDHKD=X", "美元/港幣", "國際"),
+    ("USDSGD=X", "美元/新加坡幣", "國際"), ("USDTHB=X", "美元/泰銖", "國際"), ("DX-Y.NYB", "美元指數 DXY", "國際")]
+
+def fx_derive(got, cur):
+    """X/台幣：Yahoo 有直接報價就用；沒有就用「美元/台幣」與「美元對 X」換算（開收盤各自換算）"""
+    d = got.get(f"{cur}TWD=X")
+    if (d is not None and len(d) > 1) or cur == "USD":
+        return d
+    t = got.get("USDTWD=X"); q = got.get(f"USD{cur}=X" if cur in USDBASE else f"{cur}USD=X")
+    if t is None or q is None:
+        return None
+    j = t.join(q, lsuffix="_t", rsuffix="_q", how="inner")
+    if len(j) < 2:
+        return None
+    f = (lambda a, b: a / b) if cur in USDBASE else (lambda a, b: a * b)
+    o = pd.DataFrame(index=j.index)
+    o["Open"], o["Close"] = f(j["Open_t"], j["Open_q"]), f(j["Close_t"], j["Close_q"])
+    o["High"], o["Low"], o["Volume"] = o[["Open", "Close"]].max(axis=1), o[["Open", "Close"]].min(axis=1), 0
+    return o
+
+def _age_min(name):
+    try:
+        u = json.load(open(f"{OUT}/{name}", encoding="utf-8"))["updated"]
+        return (dt.datetime.now(TZ) - dt.datetime.strptime(u, "%Y-%m-%d %H:%M").replace(tzinfo=TZ)).total_seconds() / 60
+    except Exception:
+        return 1e9
 
 def markets():
     items = [(g, y, n, sub) for g, L in MK.items() for y, n, sub in L]
-    got = download([y for _, y, _, _ in items], "6mo")
+    need = [y for _, y, _, _ in items] + [f"USD{c}=X" if c in USDBASE else f"{c}USD=X" for c, _, _ in FXC if c != "USD"]
+    got = download(list(dict.fromkeys(need)), "6mo")
     rows = []
     for g, y, n, sub in items:
-        d = got.get(y)
+        d = fx_derive(got, y[:3]) if y.endswith("TWD=X") else got.get(y)
         if d is None or len(d) < 2:
             continue
         x, p = d.iloc[-1], d.iloc[-2]
@@ -388,15 +461,121 @@ def markets():
         old = json.load(open(f"{OUT}/markets.json", encoding="utf-8"))["data"]
     except Exception:
         old = {}
-    ex = {}
+    ex = {"boterr": None}
     for k, fn in (("cg", cg_top), ("fng", fng), ("bot", bot_rates)):  # 其中一項失敗就沿用上次的
         try:
             ex[k] = fn()
         except Exception as e:
             print(k, "失敗：", e); ex[k] = old.get(k)
+            if k == "bot":
+                ex["boterr"] = str(e)[:160]
     write("markets.json", {"items": rows, **ex}, merge=False)
+    pubs = ["markets.json"]
+    if _age_min("calendar.json") > 50:   # 經濟日曆約每小時更新一次（來源有流量限制，不要太頻繁）
+        try:
+            calendar(full=False); pubs.append("calendar.json")
+        except Exception as e:
+            print("行事曆失敗：", e)
     if os.environ.get("GITHUB_REPOSITORY") or os.environ.get("PUB_REMOTE"):
-        publish("markets.json")
+        publish(*pubs)
+
+# ───────────── 三大法人買賣超（上市）、除權息預告、財報日、經濟數據日曆 ─────────────
+def chips():
+    day = dt.datetime.now(TZ); j = {}
+    for _ in range(7):   # 今天還沒公布就往前找最近一個交易日
+        d = day.strftime("%Y%m%d")
+        try:
+            j = jget(f"https://www.twse.com.tw/rwd/zh/fund/T86?response=json&date={d}&selectType=ALLBUT0999")
+        except Exception as e:
+            print("T86", d, e); j = {}
+        if j.get("stat") == "OK" and j.get("data"):
+            break
+        day -= dt.timedelta(days=1); time.sleep(1.5)
+    else:
+        raise RuntimeError("T86 近 7 天都沒有資料")
+    f = j["fields"]
+    ix = lambda k, exact=False: next(i for i, x in enumerate(f) if (x == k if exact else x.startswith(k)))
+    iF, iT, iD, iA = ix("外陸資買賣超股數"), ix("投信買賣超股數"), ix("自營商買賣超股數", True), ix("三大法人買賣超股數")
+    L = lambda r_, i: int(round((num(r_[i]) or 0) / 1000))   # 股 → 張
+    rows = [[r_[0].strip(), r_[1].strip(), L(r_, iF), L(r_, iT), L(r_, iD), L(r_, iA)] for r_ in j["data"]]
+    rows = [x for x in rows if any(x[2:])]
+    tot = []
+    try:
+        b = jget(f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?response=json&dayDate={d}&type=day")
+        tot = [[x[0], round((num(x[3]) or 0) / 1e8, 2)] for x in b.get("data", [])]   # 買賣差額（億元）
+    except Exception as e:
+        print("BFI82U", e)
+    write("chips.json", {"date": f"{d[:4]}-{d[4:6]}-{d[6:]}", "rows": rows, "total": tot}, merge=False)
+
+def roc_date(x):
+    m = re.search(r"(\d{2,3})\D+(\d{1,2})\D+(\d{1,2})", str(x))
+    return f"{int(m[1]) + 1911:04d}-{int(m[2]):02d}-{int(m[3]):02d}" if m else None
+
+def exdiv():  # 證交所除權除息預告表（上市）：[日期, 代號, 名稱, 權/息, 權值+息值]
+    j = jget("https://www.twse.com.tw/rwd/zh/exRight/TWT48U?response=json")
+    f = j["fields"]; ix = lambda k: next(i for i, x in enumerate(f) if x.startswith(k))
+    iD, iC, iN, iK, iV = ix("資料日期"), ix("股票代號"), ix("股票名稱"), ix("權/息"), ix("權值+息值")
+    out = [[roc_date(r_[iD]), r_[iC].strip(), r_[iN].strip(), str(r_[iK]).strip(), num(r_[iV])] for r_ in j.get("data", [])]
+    return sorted([x for x in out if x[0]])
+
+def tw_rules():  # 台股法定申報期限（固定規則，不需連網）
+    today = dt.datetime.now(TZ).date(); out = []
+    for y in (today.year, today.year + 1):
+        for m, d_, note in ((3, 31, "年報／第 4 季財報申報截止"), (5, 15, "第 1 季財報申報截止"), (8, 14, "第 2 季財報申報截止"), (11, 14, "第 3 季財報申報截止")):
+            x = dt.date(y, m, d_)
+            if today - dt.timedelta(days=1) <= x <= today + dt.timedelta(days=200):
+                out.append([x.isoformat(), "TW", "", "台股上市櫃", note])
+    for k in range(6):
+        y, m = divmod(today.year * 12 + today.month - 1 + k, 12)
+        x = dt.date(y, m + 1, 10)
+        if x >= today - dt.timedelta(days=1):
+            out.append([x.isoformat(), "TW", "", "台股上市櫃", "每月營收公告截止（上個月）"])
+    return sorted(out)
+
+def us_earn():  # 精選美股的下次財報日（Yahoo，可能是預估）
+    def one(x):
+        _, c, n = x; time.sleep(0.3)
+        try:
+            cal = yf.Ticker(c).calendar
+            ed = (cal.get("Earnings Date") if isinstance(cal, dict) else None) or []
+            return [[str(d)[:10], "US", c, n, "財報公布（預估）"] for d in list(ed)[:1]]
+        except Exception:
+            return []
+    return sorted(e for rows in pmap(one, [x for x in symbols() if x[0] == "US"]) for e in rows)
+
+def eco():  # 經濟數據日曆：ForexFactory 公開 JSON（本週＋下週）；非官方來源
+    out = []
+    for w in ("thisweek", "nextweek"):
+        try:
+            out += jget(f"https://nfs.faireconomy.media/ff_calendar_{w}.json")
+        except Exception as e:
+            print("經濟日曆", w, e)
+    if not out:
+        raise RuntimeError("經濟日曆抓不到")
+    return [[x.get("date"), x.get("country"), x.get("title"), x.get("impact"), x.get("forecast") or "", x.get("previous") or "", x.get("actual") or ""] for x in out]
+
+def calendar(full=True):
+    try:
+        old = json.load(open(f"{OUT}/calendar.json", encoding="utf-8"))["data"]
+    except Exception:
+        old = {}
+    d = {}
+    for k, fn in (("exdiv", exdiv), ("eco", eco)):
+        try:
+            d[k] = fn()
+        except Exception as e:
+            print("行事曆", k, "失敗：", e); d[k] = old.get(k)
+    d["tw"] = tw_rules()
+    if full or "us" not in old:
+        try:
+            d["us"] = us_earn()
+        except Exception as e:
+            print("美股財報日失敗：", e); d["us"] = old.get("us")
+    else:
+        d["us"] = old["us"]
+    if not (d.get("exdiv") or d.get("eco") or d.get("us")):
+        raise RuntimeError("行事曆全部失敗")
+    write("calendar.json", d, merge=False)
 
 # ───────────── session 模式：盤中常駐（取代 Cloud Run 的 /prefetch 與 /quote） ─────────────
 # 時區, 開始（含開盤前 5 分）, 結束（含收盤後 5 分）, 正式開盤（分鐘，當地時間）
@@ -418,7 +597,7 @@ def _git(d, *a, check=True):
         raise RuntimeError(f"git {a[0]} 失敗：{p.stderr.strip()[:200]}".replace(tok, "***"))
     return p
 
-def publish(name="live.json"):
+def publish(*names):
     """把 OUT/live.json 推到 data 分支（只換這一個檔，分支維持 1 個 commit）。
     每次先抓最新的 data 分支再換檔，並用 --force-with-lease：如果同時有 daily/universe 更新了其他檔案，不會被蓋掉。"""
     d = PUB.get("dir")
@@ -436,7 +615,8 @@ def publish(name="live.json"):
             _git(d, "checkout", "-q", "-f", "-B", "data", "FETCH_HEAD")
         else:  # data 分支還不存在：第一次發佈，整個輸出資料夾一起放上去
             shutil.copytree(OUT, d, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".git"))
-        shutil.copyfile(f"{OUT}/{name}", f"{d}/{name}")
+        for name in names or ("live.json",):
+            shutil.copyfile(f"{OUT}/{name}", f"{d}/{name}")
         _git(d, "add", "-A")
         if base and _git(d, "diff", "--cached", "--quiet", check=False).returncode == 0:
             return
@@ -490,4 +670,4 @@ if __name__ == "__main__":
     mode = sys.argv[1]
     if mode == "session":
         sys.exit(session(sys.argv[2] if len(sys.argv) > 2 else "TW"))
-    {"history": lambda: save_history(fetch("8mo")), "markets": markets, "live": live, "daily": daily, "universe": universe}[mode]()
+    {"history": lambda: save_history(fetch("8mo")), "markets": markets, "chips": chips, "calendar": calendar, "live": live, "daily": daily, "universe": universe}[mode]()

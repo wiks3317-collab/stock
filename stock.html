@@ -26,6 +26,7 @@ body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 var(--font);-w
 button,input,select{font:inherit;color:var(--tx)}
 select{border:1px solid var(--bd);background:var(--bg);border-radius:8px;padding:7px 12px}
 .mu{color:var(--mu)}
+.tt th,.tt td{display:table-cell!important}
 button{cursor:pointer}
 a{color:var(--ac)}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
@@ -155,7 +156,7 @@ canvas{display:block;width:100%;height:340px}
  <div class="wrap">
   <div class="bar">
    <h1>金融資訊</h1>
-   <div class="seg" role="group" aria-label="市場"><button class="chip on" id="mTW">台股</button><button class="chip" id="mUS">美股</button><button class="chip" id="mFX">匯率</button><button class="chip" id="mCR">加密貨幣</button><button class="chip" id="mGL">全球市場</button></div>
+   <div class="seg" role="group" aria-label="市場"><button class="chip on" id="mTW">台股</button><button class="chip" id="mUS">美股</button><button class="chip" id="mFX">匯率</button><button class="chip" id="mCR">加密貨幣</button><button class="chip" id="mGL">全球市場</button><button class="chip" id="mCAL">行事曆</button></div>
    <input id="q" type="search" placeholder="搜尋代號或名稱" aria-label="搜尋代號或名稱">
    <div class="theme-box" aria-label="網頁顏色主題"><button class="theme-sw" data-theme-choice="system" data-t="system" title="跟隨系統" aria-label="跟隨系統"></button><button class="theme-sw" data-theme-choice="light" data-t="light" title="亮色" aria-label="亮色"></button><button class="theme-sw" data-theme-choice="dark" data-t="dark" title="暗色" aria-label="暗色"></button><button class="theme-sw" data-theme-choice="sepia" data-t="sepia" title="復古暖色" aria-label="復古暖色"></button><button class="theme-sw" data-theme-choice="forest" data-t="forest" title="森林綠" aria-label="森林綠"></button><button class="theme-sw" data-theme-choice="ocean" data-t="ocean" title="海洋藍" aria-label="海洋藍"></button><button class="theme-sw" data-theme-choice="dracula" data-t="dracula" title="Dracula" aria-label="Dracula"></button></div>
   </div>
@@ -211,12 +212,13 @@ const f2=n=>n.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits
 const fv=s=>{const v=s.k[s.k.length-1].v;return s.m=='TW'?Math.round(v).toLocaleString()+' 張':(v/1e6).toFixed(1)+'M 股'};
 function row(s,i){VIS.push(s.m+s.code);const st=fav.includes(s.m+s.code);return `<tr class="r${PROXY_URL&&!GOT.has(s.m+s.code)?' stale':''}" data-k="${s.m+s.code}"><td><span class="star ${st?'on':''}" data-f="${s.m+s.code}">${st?'★':'☆'}</span>${i?`<span class="rk">${i}</span>`:''}<span class="cd">${s.code}</span>${s.name}${s.tags.slice(0,2).map(t=>`<span class="tag">${t}</span>`).join('')}</td><td class="${cls(s,s.chg)}">${f2(s.p)}</td><td class="${cls(s,s.chg)}">${s.chg>=0?'▲':'▼'} ${Math.abs(s.chg).toFixed(2)}%</td><td>${fv(s)}</td><td>${Math.round(s.score)}</td></tr>`}
 const th='<div class="tw"><table><tr><th>股票</th><th>現價</th><th>漲跌幅</th><th>成交量</th><th>熱度</th></tr>';
-function render(){if(FIN[mkt])return renderFin();SIG='';VIS=[];const m=$('main'),T=TREE[mkt];
- $('inds').innerHTML=['🔥 全市場熱門','⭐ 自選',...Object.keys(T)].map(x=>`<button class="chip ${x==ind?'on':''}" data-i="${x}">${x.replace(/^[^\p{L}\p{N}]+/u,'')}</button>`).join('');
+function render(){if(mkt=='CAL')return renderCal();if(FIN[mkt])return renderFin();SIG='';VIS=[];const m=$('main'),T=TREE[mkt];
+ $('inds').innerHTML=['🔥 全市場熱門','⭐ 自選',...(mkt=='TW'?['🏛 三大法人']:[]),...Object.keys(T)].map(x=>`<button class="chip ${x==ind?'on':''}" data-i="${x}">${x.replace(/^[^\p{L}\p{N}]+/u,'')}</button>`).join('');
  let h='';
  if(q){const r=all().filter(s=>s.m==mkt&&(s.code+s.name).toLowerCase().includes(q.toLowerCase())).slice(0,50);h=`<div class="sec"><h2>搜尋結果（${r.length}） <small style="color:var(--mu)">熱門/分類名單外亦會透過 Yahoo Finance 搜尋</small></h2>${th}${r.map(s=>row(s)).join('')}</table></div></div>`}
  else if(ind=='🔥 全市場熱門'){const r=all().filter(s=>s.m==mkt).sort((a,b)=>b.score-a.score).slice(0,20);h=`<div class="sec"><h2>${mkt=='TW'?'台股':'美股'}全市場熱門 Top 20</h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}
- else if(ind=='⭐ 自選'){const r=all().filter(s=>fav.includes(s.m+s.code));h=`<div class="sec"><h2>自選股（${r.length}）</h2>${r.length?th+r.map(s=>row(s)).join('')+'</table></div>':'<p class="empty">點股票左側的 ☆ 加入自選</p>'}</div>`}
+ else if(ind=='🏛 三大法人'&&mkt=='TW'){h=chipsHtml()}
+  else if(ind=='⭐ 自選'){const r=all().filter(s=>fav.includes(s.m+s.code));h=`<div class="sec"><h2>自選股（${r.length}）</h2>${r.length?th+r.map(s=>row(s)).join('')+'</table></div>':'<p class="empty">點股票左側的 ☆ 加入自選</p>'}</div>`}
  else {h='<div class="industry-grid">';const groups=T[ind]||{};for(const sub in groups){const r=[...groups[sub]].filter(s=>s&&s.m==mkt).sort((a,b)=>b.score-a.score).slice(0,10);if(!r.length)continue;h+=`<div class="sec"><h2>${ind} › ${sub}　<small style="color:var(--mu)">Top ${r.length}</small></h2>${th}${r.map((s,i)=>row(s,i+1)).join('')}</table></div></div>`}if(!h.includes('class="sec"'))h+='<div class="sec"><p class="empty">目前沒有可顯示的分類資料。</p></div>';h+='</div>'}
  m.innerHTML=h}
 function news(s){const a=['法人上修目標價，看好後市接單動能','外資買超，股價量能放大','公布最新月營收，年增表現受市場關注','宣布擴產計畫，產能預計逐步開出','產業供應鏈傳出新訂單消息'];const r=rng(s.r+new Date().getDate());
@@ -266,8 +268,8 @@ document.addEventListener('click',e=>{const t=e.target;
  if(t.dataset.i){ind=t.dataset.i;q='';$('q').value='';render();return}
  const tr=t.closest&&t.closest('tr.r');if(tr&&!$('ov').contains(t))(M[tr.dataset.k]?finDetail:detail)(tr.dataset.k)});
 $('ov').addEventListener('click',e=>{if(e.target.id=='ov')$('ov').style.display='none'});
-function setM(m){mkt=m;ind=FIN[m]?FIN[m][0]:'🔥 全市場熱門';q='';$('q').value='';['TW','US','FX','CR','GL'].forEach(x=>$('m'+x).classList.toggle('on',x==m));if(FIN[m]&&!MD)loadMarkets();render()}
-['TW','US','FX','CR','GL'].forEach(x=>$('m'+x).onclick=()=>setM(x));
+function setM(m){mkt=m;ind=m=='CAL'?CT[0]:FIN[m]?FIN[m][0]:'🔥 全市場熱門';q='';$('q').value='';['TW','US','FX','CR','GL','CAL'].forEach(x=>$('m'+x).classList.toggle('on',x==m));if(FIN[m]&&!MD)loadMarkets();if(m=='CAL'&&!CD)loadCal();render()}
+['TW','US','FX','CR','GL','CAL'].forEach(x=>$('m'+x).onclick=()=>setM(x));
 $('q').oninput=e=>{
  q=e.target.value.trim();render();
  clearTimeout(searchTimer);
@@ -423,11 +425,11 @@ async function proxyQuotes(force){if(BUSY)return true;let ks=[...new Set([...(cu
  finally{BUSY=false}
  return true}
 // ───────── 金融行情：匯率 / 加密貨幣 / 全球市場（資料來自 data 分支的 markets.json） ─────────
-const FIN={FX:['台幣匯率','國際匯率','臺銀牌告','換算器'],CR:['加密貨幣'],GL:['股市指數','商品','利率']};
+const FIN={FX:['主要貨幣','亞洲鄰近','國際匯率','臺銀牌告','換算器'],CR:['加密貨幣'],GL:['股市指數','商品','利率']};
 const M={};let MD=null,MU='',SIG='';
-const BN={USD:'美金',JPY:'日圓',EUR:'歐元',CNY:'人民幣',HKD:'港幣',GBP:'英鎊',AUD:'澳幣',KRW:'韓元',SGD:'新加坡幣',THB:'泰銖',CAD:'加幣',NZD:'紐幣',CHF:'瑞士法郎',VND:'越南盾',MYR:'馬來幣',PHP:'菲律賓披索',IDR:'印尼盾',SEK:'瑞典幣',ZAR:'南非幣'};
+const BN={MOP:'澳門幣',INR:'印度盧比',USD:'美金',JPY:'日圓',EUR:'歐元',CNY:'人民幣',HKD:'港幣',GBP:'英鎊',AUD:'澳幣',KRW:'韓元',SGD:'新加坡幣',THB:'泰銖',CAD:'加幣',NZD:'紐幣',CHF:'瑞士法郎',VND:'越南盾',MYR:'馬來幣',PHP:'菲律賓披索',IDR:'印尼盾',SEK:'瑞典幣',ZAR:'南非幣'};
 const FG={'Extreme Fear':'極度恐慌','Fear':'恐慌','Neutral':'中立','Greed':'貪婪','Extreme Greed':'極度貪婪'};
-const fp=v=>v==null?'—':Math.abs(v)>=1000?v.toLocaleString('en',{maximumFractionDigits:2}):Math.abs(v)>=100?v.toFixed(2):Math.abs(v)>=1?v.toFixed(3):v.toFixed(4);
+const fp=v=>v==null?'—':Math.abs(v)>=1000?v.toLocaleString('en',{maximumFractionDigits:2}):Math.abs(v)>=100?v.toFixed(2):Math.abs(v)>=1?v.toFixed(3):Math.abs(v)>=.1?v.toFixed(4):v.toFixed(5);
 const fa=v=>Math.abs(v)>=1000?Math.round(v).toLocaleString('en'):fp(v);
 const pc=v=>v==null?'<span class="mu">—</span>':`<span class="${v>=0?'up':'dn'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
 const big=v=>v==null?'—':v>=1e12?(v/1e12).toFixed(2)+' 兆':v>=1e9?(v/1e9).toFixed(1)+' B':(v/1e6).toFixed(0)+' M';
@@ -437,7 +439,7 @@ function spark(s,n=30){const a=s.k.slice(-n).map(x=>x.c);if(a.length<2)return'';
 function frow(s,mid=''){return `<tr class="r" data-k="${esc(s.code)}"><td><b>${esc(s.name)}</b><span class="tag">${esc(s.code.replace(/=X|=F|\^/g,''))}</span></td><td>${fp(s.p)}</td><td class="${cls(s,s.chg)}">${chgTxt(s)}</td>${mid}<td>${spark(s)}</td></tr>`}
 const sec=(t,n,h)=>`<div class="sec"><h2>${t}<small>${n||''}</small></h2>${h}</div>`;
 const tbl=(heads,rows)=>`<div class="tw"><table><tr>${heads.map((x,i)=>`<th${i==0?'':''}>${x}</th>`).join('')}</tr>${rows}</table></div>`;
-const CUR=['TWD','USD','JPY','EUR','CNY','GBP','AUD','HKD','KRW'];
+const CUR=()=>['TWD',...Object.keys(M).filter(k=>/^[A-Z]{3}TWD=X$/.test(k)).map(k=>k.slice(0,3))];
 const twd=c=>c=='TWD'?1:(M[c+'TWD=X']||{}).p||null;
 function cvtCalc(){const a=+$('ca').value,f=twd($('cf').value),t=twd($('ct').value);$('cr').innerHTML=f&&t&&isFinite(a)?`${a.toLocaleString()} ${$('cf').value} ≈ <b>${(a*f/t).toLocaleString('en',{maximumFractionDigits:4})} ${$('ct').value}</b>`:'—'}
 function renderFin(){VIS=[];const tabs=FIN[mkt];if(!tabs.includes(ind))ind=tabs[0];
@@ -447,10 +449,10 @@ function renderFin(){VIS=[];const tabs=FIN[mkt];if(!tabs.includes(ind))ind=tabs[
  $('stamp').textContent='Yahoo Finance／CoinGecko／臺灣銀行・最新抓取 '+MU;
  const hit=s=>!q||(s.code+s.name).toLowerCase().includes(q.toLowerCase()),L=sub=>Object.values(M).filter(s=>s.sub==sub&&hit(s));
  const H=['名稱','現價','漲跌幅','30日走勢'];let h='';
- if(ind=='台幣匯率'||ind=='國際匯率'){const sub=ind=='台幣匯率'?'台幣':'國際';h=sec(ind,sub=='台幣'?'1 外幣可換多少台幣（中間價，非銀行牌告）':'國際主要貨幣對與美元指數',tbl(H,L(sub).map(s=>frow(s)).join('')))}
+ if(ind=='主要貨幣'||ind=='亞洲鄰近'||ind=='國際匯率'){const sub=ind=='國際匯率'?'國際':ind;h=sec(ind,sub=='國際'?'國際主要貨幣對與美元指數':'1 單位外幣可換多少台幣（中間價，非銀行牌告）',tbl(H,L(sub).map(s=>frow(s)).join('')))}
  else if(ind=='臺銀牌告'){const b=(MD.bot||[]).filter(x=>!q||(x[0]+(BN[x[0]]||'')).toLowerCase().includes(q.toLowerCase()));
-  h=sec('臺灣銀行牌告匯率','「買入」＝你賣外幣給銀行；「賣出」＝你向銀行買外幣；單位：台幣',b.length?tbl(['幣別','現金買入','即期買入','現金賣出','即期賣出'],b.map(x=>`<tr><td><b>${BN[x[0]]||x[0]}</b><span class="tag">${x[0]}</span></td>${x.slice(1).map(v=>`<td>${v==null?'—':fp(v)}</td>`).join('')}</tr>`).join('')):'<p class="empty">臺銀牌告暫時抓不到，稍後再試。</p>')}
- else if(ind=='換算器'){h=sec('匯率換算','依 Yahoo Finance 中間價換算，不含銀行手續費與買賣價差',`<div class="row" id="cvt" style="padding:0 20px 8px"><input id="ca" type="number" inputmode="decimal" value="1000" aria-label="金額"><select id="cf" aria-label="從">${CUR.map(c=>`<option ${c=='USD'?'selected':''}>${c}</option>`).join('')}</select><span class="mu">換成</span><select id="ct" aria-label="到">${CUR.map(c=>`<option ${c=='TWD'?'selected':''}>${c}</option>`).join('')}</select></div><div class="px" id="cr" style="padding:0 20px;margin-bottom:24px"></div>`);m.innerHTML=h;['ca','cf','ct'].forEach(i=>$(i).oninput=$(i).onchange=cvtCalc);cvtCalc();return}
+  h=sec('臺灣銀行牌告匯率','「買入」＝你賣外幣給銀行；「賣出」＝你向銀行買外幣；單位：台幣',b.length?tbl(['幣別','現金買入','即期買入','現金賣出','即期賣出'],b.map(x=>`<tr><td><b>${BN[x[0]]||x[0]}</b><span class="tag">${x[0]}</span></td>${x.slice(1).map(v=>`<td>${v==null?'—':fp(v)}</td>`).join('')}</tr>`).join('')):`<p class="empty">臺銀牌告暫時抓不到，稍後再試。${MD.boterr?'<br><small>原因：'+esc(MD.boterr)+'</small>':''}</p>`)}
+ else if(ind=='換算器'){h=sec('匯率換算','依 Yahoo Finance 中間價換算，不含銀行手續費與買賣價差',`<div class="row" id="cvt" style="padding:0 20px 8px"><input id="ca" type="number" inputmode="decimal" value="1000" aria-label="金額"><select id="cf" aria-label="從">${CUR().map(c=>`<option value="${c}" ${c=='USD'?'selected':''}>${c} ${BN[c]||(c=='TWD'?'台幣':'')}</option>`).join('')}</select><span class="mu">換成</span><select id="ct" aria-label="到">${CUR().map(c=>`<option value="${c}" ${c=='TWD'?'selected':''}>${c} ${BN[c]||(c=='TWD'?'台幣':'')}</option>`).join('')}</select></div><div class="px" id="cr" style="padding:0 20px;margin-bottom:24px"></div>`);m.innerHTML=h;['ca','cf','ct'].forEach(i=>$(i).oninput=$(i).onchange=cvtCalc);cvtCalc();return}
  else if(mkt=='CR'){const cg=MD.cg||{},C=cg.coins||{},f=(MD.fng||[])[0],u=twd('USD');
   const kv=[cg.mcap?`<div><b>全球加密市值</b>${big(cg.mcap)} USD</div><div><b>市值 24h 變動</b>${pc(cg.chg)}</div><div><b>BTC 市占</b>${cg.btcd.toFixed(1)}%</div>`:'',f?`<div><b>恐懼與貪婪指數</b>${f[0]} ${FG[f[1]]||f[1]}</div>`:''].join('');
   const rows=L('加密貨幣').sort((a,b)=>((C[a.code.split('-')[0]]||[999])[0])-((C[b.code.split('-')[0]]||[999])[0])).map(s=>{const c=C[s.code.split('-')[0]]||[];
@@ -471,5 +473,40 @@ async function loadMarkets(){try{const d=await getJSON('markets.json',6e4);MD=d.
   if(FIN[mkt]){if(ind=='換算器'&&$('cvt')){SIG=mkt+ind+q+MU;cvtCalc()}else render()}}
  catch(e){console.warn('markets.json 載入失敗',e);if(FIN[mkt]&&!MD)$('main').innerHTML='<p class="empty">金融行情暫時無法載入：markets-data 工作流程可能還沒執行過，請到 GitHub Actions 手動執行一次。</p>'}}
 setInterval(()=>{if(!document.hidden&&liveOn&&FIN[mkt])loadMarkets()},6e4);
+// ───────── 三大法人、行事曆（資料來自 data 分支的 chips.json、calendar.json） ─────────
+let CHD=null,CHU='',CHLOAD=0,CHK='A',CHETF=false,CD=null,CU='',ECO={imp:'M',c:''};
+const CT=['經濟數據','除權息','財報'],TZ_='Asia/Taipei',tdy=()=>new Date().toLocaleDateString('sv',{timeZone:TZ_});
+const CN2={USD:'美國',EUR:'歐元區',JPY:'日本',GBP:'英國',CNY:'中國',AUD:'澳洲',CAD:'加拿大',CHF:'瑞士',NZD:'紐西蘭'},IMPN={High:'高',Medium:'中',Low:'低',Holiday:'假日'};
+async function loadChips(){CHLOAD=1;try{const d=await getJSON('chips.json',3e5);CHD=d.data;CHU=d.updated}catch(e){CHD={err:'三大法人資料暫時無法載入：chips.json 還沒產生。請到 GitHub Actions 手動執行一次 stock-data（mode 填 chips 或 daily），之後每個交易日 18:30 會自動更新。'}}if(mkt=='TW'&&ind=='🏛 三大法人')render()}
+function chipsHtml(){if(!CHD){if(!CHLOAD)loadChips();return '<p class="empty">三大法人資料載入中…</p>'}
+ if(CHD.err)return `<div class="sec"><p class="empty">${esc(CHD.err)}</p></div>`;
+ const D=CHD,k={A:5,F:2,T:3,D:4}[CHK],rows=D.rows.filter(r=>CHETF||!r[0].startsWith('00')),top=[...rows].sort((a,b)=>b[k]-a[k]).slice(0,20),bot=[...rows].sort((a,b)=>a[k]-b[k]).slice(0,20);
+ const n=v=>`<span class="${v>=0?'up':'dn'}">${v>0?'+':''}${v.toLocaleString()}</span>`,
+  tb=(t,a)=>sec(t,'單位：張',`<div class="tw"><table class="tt"><tr><th>股票</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr>${a.map(r=>`<tr class="r" data-k="TW${esc(r[0])}"><td><span class="cd">${esc(r[0])}</span>${esc(r[1])}</td><td>${n(r[2])}</td><td>${n(r[3])}</td><td>${n(r[4])}</td><td>${n(r[5])}</td></tr>`).join('')}</table></div>`),
+  kv=(D.total||[]).map(x=>`<div><b>${esc(x[0])}</b>${n(x[1])} 億</div>`).join('');
+ return `<div class="sec" style="padding:16px 20px 8px"><div class="row" style="margin-bottom:8px">${[['A','三大法人合計'],['F','外資'],['T','投信'],['D','自營商']].map(([v,t])=>`<button class="chip ${v==CHK?'on':''}" data-ck="${v}">${t}</button>`).join('')}<button class="chip ${CHETF?'on':''}" data-etf="1">含 ETF</button><small class="mu">資料日期 ${esc(D.date)}（上市；上櫃未含）</small></div>${kv?`<div class="kv">${kv}</div>`:''}</div><div class="industry-grid">${tb('買超 Top 20',top)}${tb('賣超 Top 20',bot)}</div>`}
+async function loadCal(){try{const d=await getJSON('calendar.json',3e5);CD=d.data;CU=d.updated}catch(e){if(!CD)CD={err:1}}if(mkt=='CAL'){SIG='';render()}}
+function renderCal(){const sig='CAL'+ind+q+CU+ECO.imp+ECO.c+(CD?1:0);if(sig==SIG&&$('main').firstChild)return;SIG=sig;VIS=[];if(!CT.includes(ind))ind=CT[0];
+ $('inds').innerHTML=CT.map(x=>`<button class="chip ${x==ind?'on':''}" data-i="${x}">${x}</button>`).join('');
+ const m=$('main');if(!CD){m.innerHTML='<p class="empty">行事曆載入中…</p>';return}
+ if(CD.err){m.innerHTML='<p class="empty">行事曆暫時無法載入：calendar.json 還沒產生。請到 GitHub Actions 手動執行一次 stock-data（mode 填 calendar），或等 markets-data 整點更新。</p>';return}
+ $('stamp').textContent='ForexFactory／證交所／Yahoo Finance・最新抓取 '+CU;
+ const t0=tdy(),hit=(c,nm)=>!q||(c+nm).toLowerCase().includes(q.toLowerCase()),L='text-align:left;white-space:normal';let h='';
+ if(ind=='經濟數據'){const E=(CD.eco||[]).filter(e=>(ECO.imp=='A'||e[3]=='High'||(ECO.imp=='M'&&e[3]=='Medium'))&&(!ECO.c||e[1]==ECO.c)&&hit(e[1],e[2])),cs=[...new Set((CD.eco||[]).map(e=>e[1]))];
+  let last='',rows='';for(const e of E){const d=new Date(e[0]),ds=d.toLocaleDateString('zh-TW',{timeZone:TZ_,month:'numeric',day:'numeric',weekday:'short'}),dk=d.toLocaleDateString('sv',{timeZone:TZ_});
+   if(ds!=last){last=ds;rows+=`<tr><td colspan="7" style="${L};font-weight:600;background:var(--gut)">${ds}${dk==t0?'　今天':''}</td></tr>`}
+   const col=({High:'var(--up)',Medium:'#d9a441'})[e[3]]||'var(--mu)';
+   rows+=`<tr style="${d<Date.now()?'opacity:.55':''}"><td>${isNaN(d)?'—':d.toLocaleTimeString('zh-TW',{timeZone:TZ_,hour:'2-digit',minute:'2-digit',hour12:false})}</td><td style="${L}">${esc(CN2[e[1]]||e[1])}</td><td style="${L}">${esc(e[2])}</td><td><span style="color:${col}">●</span> ${IMPN[e[3]]||esc(e[3])}</td><td>${esc(e[4])||'—'}</td><td>${esc(e[5])||'—'}</td><td>${esc(e[6])||'—'}</td></tr>`}
+  h=`<div class="sec" style="padding:16px 20px 12px"><div class="row" style="margin-bottom:8px">${[['H','僅高重要性'],['M','中以上'],['A','全部']].map(([v,t])=>`<button class="chip ${v==ECO.imp?'on':''}" data-ei="${v}">${t}</button>`).join('')}</div><div class="row">${[['','全部國家'],...cs.map(c=>[c,CN2[c]||c])].map(([v,t])=>`<button class="chip ${v==ECO.c?'on':''}" data-ec="${v}">${t}</button>`).join('')}</div></div>`
+   +sec('經濟數據日曆','時間為台北時間；事件名稱為英文原文；來源 ForexFactory（非官方），僅供參考',rows?tbl(['時間','國家','事件','重要性','預測','前值','公布'],rows):'<p class="empty">沒有符合條件的事件</p>')}
+ else if(ind=='除權息'){const E=(CD.exdiv||[]).filter(x=>x[0]>=t0&&hit(x[1],x[2]));
+  h=sec('除權息預告','證交所公布的即將除權息（上市；上櫃未含）。金額＝權值＋息值（每股）',E.length?tbl(['日期','股票','類型','金額'],E.map(x=>`<tr class="r" data-k="TW${esc(x[1])}"><td style="${L}">${x[0]}${x[0]==t0?'　今天':''}</td><td style="${L}"><span class="cd">${esc(x[1])}</span>${esc(x[2])}</td><td>${x[3]=='息'?'除息':x[3]=='權'?'除權':esc(x[3])}</td><td>${x[4]==null?'—':nz(x[4],4)}</td></tr>`).join('')):'<p class="empty">目前沒有符合的除權息預告</p>')}
+ else{const E=[...(CD.tw||[]),...(CD.us||[])].filter(x=>x[0]>=t0&&hit(x[2],x[3])).sort((a,b)=>a[0]<b[0]?-1:1).slice(0,300);
+  h=sec('財報與申報日','台股為法定申報期限（個別公司公告日可能更早）；美股為精選名單的財報日（Yahoo，可能是預估）',E.length?tbl(['日期','市場','標的','說明'],E.map(x=>`<tr${x[1]=='US'&&x[2]?` class="r" data-k="US${esc(x[2])}"`:''}><td style="${L}">${x[0]}${x[0]==t0?'　今天':''}</td><td>${x[1]=='US'?'美股':'台股'}</td><td style="${L}">${x[2]?`<span class="cd">${esc(x[2])}</span>`:''}${esc(x[3])}</td><td style="${L}">${esc(x[4])}</td></tr>`).join('')):'<p class="empty">沒有符合的項目</p>')}
+ m.innerHTML=h}
+document.addEventListener('click',e=>{const t=e.target;
+ if(t.dataset.ck){CHK=t.dataset.ck;render()}else if(t.dataset.etf){CHETF=!CHETF;render()}
+ else if(t.dataset.ei){ECO.imp=t.dataset.ei;render()}else if(t.dataset.ec!==undefined){ECO.c=t.dataset.ec;render()}});
+setInterval(()=>{if(!document.hidden&&liveOn&&mkt=='CAL')loadCal()},3e5);
 ind='🔥 全市場熱門';render();loadMarkets();Promise.allSettled([loadHistory(),loadUniverse()]).then(async()=>{LOADED=true;await loadQuotes();recalc();render();if(PROXY_URL)proxyQuotes(true).then(()=>{recalc();render()})});
 </script></body></html>
