@@ -1,0 +1,33 @@
+name: markets-data
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # 匯率、加密貨幣、全球指數／商品／利率：每 10 分鐘（GitHub 排程可能延遲幾分鐘）
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: markets-data
+  cancel-in-progress: true
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: 取得既有的 data 分支（第一次執行時不存在，會略過）
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: data
+          path: pub
+      - run: mkdir -p pub
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 抓取並發佈 markets.json 到 data 分支
+        run: python fetch_data.py markets
+        env:
+          OUT_DIR: pub
+          GH_TOKEN: ${{ github.token }}
