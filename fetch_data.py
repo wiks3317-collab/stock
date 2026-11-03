@@ -371,60 +371,28 @@ def _get(url, tries=3):
             last = e; time.sleep(2 * (i + 1))
     raise last
 
-def _bot_csv(txt):
-    rows = list(csv.reader(io.StringIO(txt)))
-    hdr = next((r_ for r_ in rows if "現金" in [x.strip() for x in r_]), [])
-    ci = [i for i, x in enumerate(hdr) if x.strip() == "現金"]
-    idx = (ci[0], ci[0] + 1, ci[1], ci[1] + 1) if len(ci) >= 2 else (2, 3, 12, 13)   # 買入現金、買入即期、賣出現金、賣出即期
-    out = []
-    for r_ in rows:
-        c = re.match(r"\s*([A-Z]{3})\b", r_[0]) if r_ else None
-        if c and len(r_) > idx[3]:
-            out.append([c[1]] + [num(r_[i]) or None for i in idx])
+def alt_rates():
+    """多來源參考匯率（皆為中間價，換算成「1 單位外幣 = 多少台幣」）：open.er-api.com、開源 currency-api（jsDelivr）、rter.info"""
+    codes = [c for c, _, _ in FXC]; out, errs = {}, []
+    try:
+        r_ = jget("https://open.er-api.com/v6/latest/USD")["rates"]
+        out["er"] = {c: rr(r_["TWD"] / r_[c]) for c in codes if r_.get(c)}
+    except Exception as e:
+        errs.append(f"open.er-api：{str(e)[:50]}")
+    try:
+        r_ = jget("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/twd.json")["twd"]
+        out["oss"] = {c: rr(1 / r_[c.lower()]) for c in codes if r_.get(c.lower())}
+    except Exception as e:
+        errs.append(f"currency-api：{str(e)[:50]}")
+    try:
+        r_ = jget("https://tw.rter.info/capi.php"); t = r_["USDTWD"]["Exch"]
+        out["rt"] = {c: rr(t if c == "USD" else t / r_["USD" + c]["Exch"]) for c in codes if c == "USD" or r_.get("USD" + c)}
+    except Exception as e:
+        errs.append(f"rter.info：{str(e)[:50]}")
     if not out:
-        raise ValueError("CSV 沒有幣別資料")
+        raise RuntimeError("；".join(errs))
+    out["errs"] = errs
     return out
-
-def _bot_html(html):  # 牌告網頁表格（欄位以 data-table 屬性辨識）
-    out = []
-    for tr in re.findall(r"<tr>.*?</tr>", html, re.S):
-        c = re.search(r"\(([A-Z]{3})\)", tr)
-        v = [re.search(r'data-table="本行%s"[^>]*>\s*([^<\s]+)' % k, tr) for k in ("現金買入", "即期買入", "現金賣出", "即期賣出")]
-        if c and all(v):
-            out.append([c[1]] + [num(x[1]) or None for x in v])
-    if not out:
-        raise ValueError("網頁表格沒有幣別資料")
-    return out
-
-def _peek(body):  # 回應不是預期內容時，抓出標題或開頭文字，方便判斷是不是被擋
-    t = body.decode("utf-8", "replace")
-    m = re.search(r"<title[^>]*>(.*?)</title>", t, re.S | re.I)
-    return (m[1] if m else re.sub(r"<[^>]+>", " ", t))[:50].strip().replace("\n", " ")
-
-BOT_TRY = [("https://rate.bot.com.tw/xrt/flcsv/0/day", _bot_csv), ("http://rate.bot.com.tw/xrt/flcsv/0/day", _bot_csv),
-           ("https://rate.bot.com.tw/xrt?Lang=zh-TW", _bot_html)]
-BOT_UA = [BH["User-Agent"], "curl/8.5.0"]
-
-def bot_rates():
-    """臺灣銀行牌告匯率：[幣別, 現金買入, 即期買入, 現金賣出, 即期賣出]。依序嘗試 https／http CSV、牌告網頁，各用兩種 User-Agent；
-    全部失敗時，錯誤訊息會附上 HTTP 狀態與回應標題（判斷是不是被擋）。"""
-    diag = []
-    for url, parse in BOT_TRY:
-        for ua in BOT_UA:
-            try:
-                req = urllib.request.Request(url, headers={**BH, "User-Agent": ua, "Referer": "https://rate.bot.com.tw/xrt"})
-                try:
-                    r_ = urllib.request.urlopen(req, timeout=20); st, body = r_.status, r_.read()
-                except urllib.error.HTTPError as e:
-                    st, body = e.code, e.read()
-                try:
-                    return parse(body.decode("utf-8-sig", "replace"))
-                except Exception:
-                    diag.append(f"{url.split(':')[0]} {'CSV' if parse is _bot_csv else '網頁'} HTTP {st} 「{_peek(body)}」")
-            except Exception as e:
-                diag.append(f"{url.split(':')[0]} {'CSV' if parse is _bot_csv else '網頁'} {type(e).__name__}:{str(e)[:40]}")
-            time.sleep(1)
-    raise RuntimeError("；".join(dict.fromkeys(diag))[:300])
 
 FXC = [("USD", "美元", "主要貨幣"), ("EUR", "歐元", "主要貨幣"), ("GBP", "英鎊", "主要貨幣"), ("AUD", "澳幣", "主要貨幣"),
        ("CAD", "加幣", "主要貨幣"), ("NZD", "紐幣", "主要貨幣"), ("CHF", "瑞士法郎", "主要貨幣"),
@@ -480,19 +448,12 @@ def markets():
         old = json.load(open(f"{OUT}/markets.json", encoding="utf-8"))["data"]
     except Exception:
         old = {}
-    ex = {"boterr": None, "botat": old.get("botat")}
-    for k, fn in (("cg", cg_top), ("fng", fng), ("bot", bot_rates)):  # 其中一項失敗就沿用上次的
-        if k == "bot" and old.get("boterr") and old.get("botat") and \
-                (dt.datetime.now(TZ) - dt.datetime.strptime(old["botat"], "%Y-%m-%d %H:%M").replace(tzinfo=TZ)).total_seconds() < 1800:
-            ex["bot"], ex["boterr"] = old.get("bot"), old["boterr"]; continue   # 上次失敗不到 30 分鐘：先不重試
+    ex = {}
+    for k, fn in (("cg", cg_top), ("fng", fng), ("alt", alt_rates)):  # 其中一項失敗就沿用上次的
         try:
             ex[k] = fn()
-            if k == "bot":
-                ex["botat"] = dt.datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
         except Exception as e:
             print(k, "失敗：", e); ex[k] = old.get(k)
-            if k == "bot":
-                ex["boterr"] = str(e)[:300]; ex["botat"] = dt.datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     write("markets.json", {"items": rows, **ex}, merge=False)
     pubs = ["markets.json"]
     if _age_min("calendar.json") > 50:   # 經濟日曆約每小時更新一次（來源有流量限制，不要太頻繁）
@@ -532,15 +493,68 @@ def chips():
     write("chips.json", {"date": f"{d[:4]}-{d[4:6]}-{d[6:]}", "rows": rows, "total": tot}, merge=False)
 
 def roc_date(x):
-    m = re.search(r"(\d{2,3})\D+(\d{1,2})\D+(\d{1,2})", str(x))
+    x = str(x).strip()
+    if re.fullmatch(r"\d{7}", x):
+        return f"{int(x[:3]) + 1911:04d}-{x[3:5]}-{x[5:]}"
+    m = re.search(r"(\d{2,3})\D+(\d{1,2})\D+(\d{1,2})", x)
     return f"{int(m[1]) + 1911:04d}-{int(m[2]):02d}-{int(m[3]):02d}" if m else None
 
-def exdiv():  # 證交所除權除息預告表（上市）：[日期, 代號, 名稱, 權/息, 權值+息值]
-    j = jget("https://www.twse.com.tw/rwd/zh/exRight/TWT48U?response=json")
-    f = j["fields"]; ix = lambda k: next(i for i, x in enumerate(f) if x.startswith(k))
-    iD, iC, iN, iK, iV = ix("資料日期"), ix("股票代號"), ix("股票名稱"), ix("權/息"), ix("權值+息值")
-    out = [[roc_date(r_[iD]), r_[iC].strip(), r_[iN].strip(), str(r_[iK]).strip(), num(r_[iV])] for r_ in j.get("data", [])]
-    return sorted([x for x in out if x[0]])
+def _kind(v):
+    v = str(v).strip()
+    return ("權息" if "權" in v and "息" in v else "權" if "權" in v else "息") if v and set(v) <= set("除權息") else None
+
+def _ex_generic(arr):  # OpenAPI 的欄位名稱不固定，依「值的樣子」辨識：日期、代號、名稱、權/息、金額
+    out = []
+    for r_ in arr:
+        it = [(k, v) for k, v in r_.items() if isinstance(v, str)]
+        date = next((roc_date(v) for _, v in it if re.fullmatch(r"\d{7}|\d{2,3}[年/.\-]\d{1,2}[月/.\-]\d{1,2}日?", v.strip())), None)
+        ci = next((n for n, (_, v) in enumerate(it) if re.fullmatch(r"\d{4,6}[A-Z]?", v.strip())), None)
+        if not date or ci is None:
+            continue
+        name = next((v.strip() for _, v in it[ci + 1:] if re.search(r"\D", v) and not _kind(v)), "")
+        kind = next((_kind(v) for _, v in it if _kind(v)), "")
+        amt = next((num(v) for k, v in it if re.search(r"權值|息值|現金股利|Dividend", k) and num(v)), None)
+        out.append([date, it[ci][1].strip(), name, kind, amt])
+    return out
+
+def _ex_twse():
+    errs = []
+    try:
+        j = jget("https://www.twse.com.tw/rwd/zh/exRight/TWT48U?response=json")
+        f = j["fields"]; ix = lambda k: next(i for i, x in enumerate(f) if x.startswith(k))
+        iD, iC, iN, iK, iV = ix("資料日期"), ix("股票代號"), ix("股票名稱"), ix("權/息"), ix("權值+息值")
+        rows = [[roc_date(r_[iD]), r_[iC].strip(), r_[iN].strip(), str(r_[iK]).strip(), num(r_[iV])] for r_ in j.get("data", [])]
+        rows = [x for x in rows if x[0]]
+        if rows:
+            return rows
+        errs.append("rwd 沒有資料")
+    except Exception as e:
+        errs.append(f"rwd {type(e).__name__}:{str(e)[:50]}")
+    try:
+        rows = _ex_generic(jget("https://openapi.twse.com.tw/v1/exchangeReport/TWT48U_ALL"))
+        if rows:
+            return rows
+        errs.append("openapi 沒有資料")
+    except Exception as e:
+        errs.append(f"openapi {type(e).__name__}:{str(e)[:50]}")
+    raise RuntimeError(" / ".join(errs))
+
+def _ex_tpex():
+    rows = _ex_generic(jget("https://www.tpex.org.tw/openapi/v1/tpex_exright_prepost"))
+    if not rows:
+        raise RuntimeError("沒有資料")
+    return rows
+
+def exdiv():  # 除權除息預告：[日期, 代號, 名稱, 權/息, 金額(權值+息值)]；回傳 (資料, 失敗訊息)
+    out, errs = [], []
+    for name, fn in (("上市", _ex_twse), ("上櫃", _ex_tpex)):
+        try:
+            out += fn()
+        except Exception as e:
+            errs.append(f"{name}：{str(e)[:120]}")
+    if not out:
+        raise RuntimeError("；".join(errs))
+    return sorted(out), "；".join(errs)
 
 def tw_rules():  # 台股法定申報期限（固定規則，不需連網）
     today = dt.datetime.now(TZ).date(); out = []
@@ -583,20 +597,26 @@ def calendar(full=True):
         old = json.load(open(f"{OUT}/calendar.json", encoding="utf-8"))["data"]
     except Exception:
         old = {}
-    d = {}
-    for k, fn in (("exdiv", exdiv), ("eco", eco)):
-        try:
-            d[k] = fn()
-        except Exception as e:
-            print("行事曆", k, "失敗：", e); d[k] = old.get(k)
+    d, errs = {}, {}
+    try:
+        d["exdiv"], w = exdiv()
+        if w:
+            errs["exdiv"] = w   # 部分來源失敗（例如上櫃）
+    except Exception as e:
+        print("除權息失敗：", e); d["exdiv"] = old.get("exdiv"); errs["exdiv"] = str(e)[:260]
+    try:
+        d["eco"] = eco()
+    except Exception as e:
+        print("經濟日曆失敗：", e); d["eco"] = old.get("eco"); errs["eco"] = str(e)[:160]
     d["tw"] = tw_rules()
     if full or "us" not in old:
         try:
             d["us"] = us_earn()
         except Exception as e:
-            print("美股財報日失敗：", e); d["us"] = old.get("us")
+            print("美股財報日失敗：", e); d["us"] = old.get("us"); errs["us"] = str(e)[:160]
     else:
         d["us"] = old["us"]
+    d["errs"] = errs
     if not (d.get("exdiv") or d.get("eco") or d.get("us")):
         raise RuntimeError("行事曆全部失敗")
     write("calendar.json", d, merge=False)
