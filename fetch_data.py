@@ -503,6 +503,8 @@ def _kind(v):
     v = str(v).strip()
     return ("權息" if "權" in v and "息" in v else "權" if "權" in v else "息") if v and set(v) <= set("除權息") else None
 
+DBG = {}   # 除權息欄位診斷：保留幾筆沒抓到金額的原始資料，寫進 calendar.json 的 dbg（頁面下方「欄位診斷」可展開）
+
 def _pick(it, pats, bad=r"date|日期|增資|increase|subscri|price|價|ratio|率"):
     """依欄位名稱挑數值；排除名稱含日期／增資／價格／比率的欄位，以及長得像民國日期（7 位數）的值"""
     for k, v in it:
@@ -522,32 +524,39 @@ def _ex_generic(arr, mk):  # OpenAPI 的欄位名稱不固定：日期／代號�
             continue
         name = next((v.strip() for _, v in it[ci + 1:] if re.search(r"\D", v) and not _kind(v)), "")
         kind = next((_kind(v) for _, v in it if _kind(v)), "")
-        cash = _pick(it, [r"現金股利", r"cash.?div", r"cashdiv"])
+        cash = _pick(it, [r"現金股利", r"cash.?div"])
         stock = _pick(it, [r"無償", r"stock.?div", r"bonus", r"free.?share"], bad=r"date|日期|增資|increase|subscri|price|價")
-        out.append([date, it[ci][1].strip(), name, kind, cash, stock, mk])
+        sp = _pick(it, [r"認購價", r"subscri.*pri", r"pri.*subscri"], bad=r"date|日期")
+        sr = _pick(it, [r"增資.*配股率", r"subscri.*(ratio|rate)", r"(ratio|rate).*subscri"], bad=r"date|日期|price|價")
+        if cash is None and kind in ("息", "權息") and len(DBG.setdefault(mk + "_raw", [])) < 2:
+            DBG[mk + "_raw"].append({k: str(v)[:24] for k, v in r_.items()})
+        out.append([date, it[ci][1].strip(), name, kind, cash, stock, mk, [sp, sr] if sp or sr else None])
     return out
 
 def _ex_twse():
-    errs = []
-    try:
+    errs, rwd, opn = [], [], []
+    try:   # 證交所網頁介面：「權值+息值」通常只有近幾天要除息的才算得出來
         j = jget("https://www.twse.com.tw/rwd/zh/exRight/TWT48U?response=json")
         f = j["fields"]; ix = lambda k: next(i for i, x in enumerate(f) if x.startswith(k))
         iD, iC, iN, iK, iV = ix("資料日期"), ix("股票代號"), ix("股票名稱"), ix("權/息"), ix("權值+息值")
-        rows = [[roc_date(r_[iD]), r_[iC].strip(), r_[iN].strip(), str(r_[iK]).strip(), num(r_[iV]) if str(r_[iK]).strip() == "息" else None, None, "TWSE"] for r_ in j.get("data", [])]
-        rows = [x for x in rows if x[0]]
-        if rows:
-            return rows
-        errs.append("rwd 沒有資料")
+        rwd = [[roc_date(r_[iD]), r_[iC].strip(), r_[iN].strip(), str(r_[iK]).strip(), num(r_[iV]) if str(r_[iK]).strip() == "息" else None, None, "TWSE", None] for r_ in j.get("data", [])]
+        rwd = [x for x in rwd if x[0]]
     except Exception as e:
         errs.append(f"rwd {type(e).__name__}:{str(e)[:50]}")
-    try:
-        rows = _ex_generic(jget("https://openapi.twse.com.tw/v1/exchangeReport/TWT48U_ALL"), "TWSE")
-        if rows:
-            return rows
-        errs.append("openapi 沒有資料")
+    try:   # OpenAPI：有董事會決議的現金股利，較遠的日期也有
+        opn = _ex_generic(jget("https://openapi.twse.com.tw/v1/exchangeReport/TWT48U_ALL"), "TWSE")
     except Exception as e:
         errs.append(f"openapi {type(e).__name__}:{str(e)[:50]}")
-    raise RuntimeError(" / ".join(errs))
+    if not rwd and not opn:
+        raise RuntimeError(" / ".join(errs) or "沒有資料")
+    DBG["twse"] = {"rwd": len(rwd), "openapi": len(opn)}
+    base = {(x[0], x[1]): x for x in rwd}
+    for x in opn:   # 兩邊都有：以 OpenAPI 為主，缺的金額用 rwd 補
+        b = base.get((x[0], x[1]))
+        if b and x[4] is None:
+            x[4] = b[4]
+        base[(x[0], x[1])] = x
+    return sorted(base.values())
 
 def _ex_tpex():
     rows = _ex_generic(jget("https://www.tpex.org.tw/openapi/v1/tpex_exright_prepost"), "TPEx")
@@ -556,18 +565,23 @@ def _ex_tpex():
     return rows
 
 def exdiv_enrich(rows, old_rows, fetch):
-    """補上近四季 EPS 與股價（Yahoo），用來算配息率、殖利率。fetch=False（每小時更新）時沿用上次的數值。
-    回傳列格式：[日期, 代號, 名稱, 權/息, 現金股利, 無償配股率, EPS, 股價, 市場]"""
-    old = {x[1]: x[6:8] for x in (old_rows or []) if len(x) >= 9}
+    """補上近四季 EPS、股價、上次配息（Yahoo），用來算配息率、殖利率。fetch=False（每小時更新）時沿用上次的數值。
+    回傳列格式：[日期, 代號, 名稱, 權/息, 現金股利, 無償配股率, EPS, 股價, 市場, 上次配息, [現增認購價, 現增配股率]]"""
+    old = {x[1]: [x[6], x[7], x[9] if len(x) > 9 else None] for x in (old_rows or []) if len(x) >= 9}
     def one(c):
         time.sleep(0.3)
         try:
-            i = yf.Ticker(c[0] + (".TWO" if c[1] == "TPEx" else ".TW")).info or {}
-            return c[0], [i.get("trailingEps"), i.get("currentPrice") or i.get("regularMarketPrice") or i.get("previousClose")]
+            t = yf.Ticker(c[0] + (".TWO" if c[1] == "TPEx" else ".TW")); i = t.info or {}
+            try:
+                dv = t.dividends; last = round(float(dv.iloc[-1]), 4) if len(dv) else None
+            except Exception:
+                last = None
+            return c[0], [i.get("trailingEps"), i.get("currentPrice") or i.get("regularMarketPrice") or i.get("previousClose"), last]
         except Exception:
             return c[0], None
-    got = dict(pmap(one, sorted({(x[1], x[6]) for x in rows if x[4]}))) if fetch else {}
-    return [x[:6] + (got.get(x[1]) or old.get(x[1]) or [None, None]) + [x[6]] for x in rows]
+    need = sorted({(x[1], x[6]) for x in rows if x[4] or x[3] in ("息", "權息")}) if fetch else []
+    got = dict(pmap(one, need[:500]))
+    return [x[:6] + (got.get(x[1]) or old.get(x[1]) or [None, None, None])[:2] + [x[6], (got.get(x[1]) or old.get(x[1]) or [None] * 3)[2], x[7]] for x in rows]
 
 def exdiv():  # 除權除息預告（上市＋上櫃）；回傳 (資料, 失敗訊息)
     out, errs = [], []
@@ -622,6 +636,7 @@ def calendar(full=True):
     except Exception:
         old = {}
     d, errs = {}, {}
+    DBG.clear()
     try:
         rows, w = exdiv()
         d["exdiv"] = exdiv_enrich(rows, old.get("exdiv"), full)
@@ -641,7 +656,7 @@ def calendar(full=True):
             print("美股財報日失敗：", e); d["us"] = old.get("us"); errs["us"] = str(e)[:160]
     else:
         d["us"] = old["us"]
-    d["errs"] = errs
+    d["errs"] = errs; d["dbg"] = DBG
     if not (d.get("exdiv") or d.get("eco") or d.get("us")):
         raise RuntimeError("行事曆全部失敗")
     write("calendar.json", d, merge=False)
